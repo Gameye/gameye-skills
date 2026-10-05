@@ -34,7 +34,7 @@ Get these invariants right and everything downstream works.
    with no drain. Flush the essentials (results, stats, artifacts) within about 10
    seconds of SIGTERM; the configured grace window before a hard kill can be up to
    50 seconds, but don't design around the maximum.
-5. **Log to stdout/stderr.** That's what the logs endpoint and Kibana capture. A log
+5. **Log to stdout/stderr.** That's what the logs endpoint (`GET /logs`) captures. A log
    file inside the container is invisible and dies with the filesystem.
 6. **Exit when the match ends.** Exit code 0 ends the session cleanly. Don't idle —
    billing runs per minute of container runtime.

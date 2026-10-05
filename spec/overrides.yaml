@@ -126,6 +126,16 @@ overrides:
     fact: Server checks `application:write`; the spec declares no security for this operation.
     evidence:
       - {file: internal/orchestrator/clientapi/edit_application.go, function: EditApplicationRoute.ServeHTTP}
+  - operation: edit-application
+    kind: behavior
+    spec_says: "Edit an application."
+    fact: >-
+      Edit is a partial update: omitted fields stay unchanged, while `ports` and
+      `regions`, when sent, replace the whole list. The `tls` flag on ports is
+      not applied by edit, so ports sent through edit end up with `tls=false`;
+      set TLS ports when creating the application or ask Gameye support.
+    evidence:
+      - {file: internal/orchestrator/clientapi/edit_application.go, function: EditApplicationRoute.ServeHTTP}
   - operation: enable-tag
     kind: scope
     scope: regions:read
