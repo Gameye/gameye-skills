@@ -1,6 +1,8 @@
 ---
 name: gameye-unreal-server
 description: Produce an Unreal Engine dedicated server build that runs on Gameye — the Server build target, Linux cross-compilation, packaging, runtime flags, and containerization specifics. Use whenever building or debugging an Unreal dedicated server, adding a Server target to a UE project, packaging a Linux server build, or when the user mentions Unreal server hosting, UE dedicated servers, or running Unreal on Gameye.
+metadata:
+  version: "1.0.0"
 ---
 
 # Unreal dedicated servers on Gameye
@@ -69,13 +71,17 @@ Launch shape for containers:
   logs endpoint can see it, not only in `Saved/Logs/`.
 - `-unattended` — no interactive prompts.
 - The startup map/mode can come straight from session `args`
-  (`MyMap?game=MyGameMode`), which your matchmaker sets per match.
+  (`MyMap?game=MyGameMode`), which your matchmaker sets per match. Under warm pools
+  request `args` and `env` are ignored, so fetch the match config from your backend
+  at boot instead (`gameye-server-design`).
 
 Read env config with `FPlatformMisc::GetEnvironmentVariable(TEXT("MATCH_ID"))`;
 parse extra args with `FParse::Value(FCommandLine::Get(), ...)`. Log a
 `READY port=7777` line from `AGameModeBase::BeginPlay` (or once `OnStart` completes),
-and log player logins/logouts (`PostLogin`/`Logout`) — your backend relays those to
-Gameye's player join/leave endpoints.
+and log player logins/logouts (`PostLogin`/`Logout`). Report them to your backend,
+which relays them to Gameye's player join/leave endpoints — the server never holds a
+Gameye API token, and session env (readable by any `session:read` token in your
+organization) carries only short-lived per-match values.
 
 ## Shutdown
 
@@ -87,8 +93,11 @@ FCoreDelegates::OnEnginePreExit.AddStatic(&ReportResultsAndFlush);
 // on match end: ReportResultsAndFlush(); FPlatformMisc::RequestExit(false);
 ```
 
-Write replays/stats you want post-mortem to the artifact path agreed for your
-application before exiting (`gameye-sessions-api` → artifacts). Exit when the match
+Get the essentials out within about 10 seconds of SIGTERM; the window before the
+container is killed is up to 50 seconds, but don't spend it. Write replays/stats you
+want post-mortem to one fixed directory before exiting, and fetch it after `exited`
+with `GET /artifacts?session=<session-id>&path=<that-directory>` (a plain tar;
+`gameye-sessions-api` → artifacts). Exit when the match
 ends; don't seamless-travel back to a lobby on a hosted session.
 
 ## Container specifics
@@ -116,5 +125,4 @@ billed; see `gameye-containerize`).
 
 Typical stacks: **EOS Matchmaking/Sessions** or **PlayFab** forming the match, then
 your allocator calling Gameye `POST /session` and distributing `host:port` to clients
-(full patterns in `gameye-matchmaking`). A `gameye-unreal-bootstrap` CLI mirroring
-the Unity one is in planning — check its repo status before building bespoke CI glue.
+(full patterns in `gameye-matchmaking`).

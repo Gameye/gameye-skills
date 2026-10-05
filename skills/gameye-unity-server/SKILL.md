@@ -1,33 +1,14 @@
 ---
 name: gameye-unity-server
-description: Produce a Unity dedicated server build that runs on Gameye — the Dedicated Server build target, netcode choices (Netcode for GameObjects, FishNet, Mirror, Photon Fusion), runtime configuration, containerization specifics, and the gameye-unity-bootstrap fast path. Use whenever building or debugging a Unity multiplayer server, adding dedicated server support to a Unity project, or when the user mentions Unity headless builds, Unity server hosting, Unity Matchmaker, or running Unity on Gameye.
+description: Produce a Unity dedicated server build that runs on Gameye — the Dedicated Server build target, netcode choices (Netcode for GameObjects, FishNet, Mirror, Photon Fusion), runtime configuration, shutdown, and containerization specifics. Use whenever building or debugging a Unity multiplayer server, adding dedicated server support to a Unity project, or when the user mentions Unity headless builds, Unity server hosting, Unity Matchmaker, or running Unity on Gameye.
+metadata:
+  version: "1.0.0"
 ---
 
 # Unity dedicated servers on Gameye
 
 Read `gameye-server-design` for the architecture contract and `gameye-containerize`
 for the container contract first; this skill covers what's Unity-specific.
-
-## The fast path
-
-If the project will use **Unity Matchmaker** for matchmaking, use the
-[`gameye-unity-bootstrap`](https://github.com/gameye/gameye-unity-bootstrap) CLI
-before hand-rolling anything:
-
-```bash
-npm install -g gameye-unity-bootstrap
-gameye-unity init        # writes config + starter Dockerfile
-gameye-unity login       # Unity, Gameye, Docker Hub credentials
-gameye-unity image push  # linux/amd64 build, <git-sha> + latest tags
-gameye-unity deploy      # deploys the Cloud Code allocator module
-gameye-unity smoke-test  # real Matchmaker ticket end to end
-gameye-unity doctor      # points at the exact broken link when something fails
-```
-
-It encodes the working Unity Matchmaker + Gameye + Docker Hub recipe, including the
-Cloud Code allocator that calls `POST /session` when a match forms. The rest of this
-skill still applies to the server build itself, and entirely applies when using a
-different matchmaker.
 
 ## Build target
 
@@ -64,14 +45,12 @@ Any Unity netcode stack with a server-authoritative dedicated mode works — Gam
 just runs the process:
 
 - **Netcode for GameObjects (NGO)** with Unity Transport — Unity's first-party stack;
-  pairs naturally with Unity Matchmaker and the bootstrap CLI.
-- **FishNet** — Gameye maintains a runnable reference:
-  [`gameye-fishnet-sample`](https://github.com/gameye/gameye-fishnet-sample) (project,
-  Dockerfile, CI). Start from it rather than from a blank page.
+  pairs naturally with Unity Matchmaker.
+- **FishNet** — open source, server-authoritative, with a dedicated server mode;
+  same integration shape.
 - **Mirror** — mature and widely documented; same integration shape.
-- **Photon Fusion** in dedicated server mode — a Gameye integration exists; here
-  Fusion handles simulation/replication while Gameye replaces Photon cloud as the
-  place servers run.
+- **Photon Fusion** in dedicated server mode — Fusion handles
+  simulation/replication while Gameye is the place the server processes run.
 
 Whichever stack: listen on `0.0.0.0` on a fixed port. With Unity Transport:
 
@@ -94,8 +73,18 @@ string matchId = Env("MATCH_ID", "local");
 // args: Environment.GetCommandLineArgs() for --key=value extras
 ```
 
-Log a `READY port=7777` line once `StartServer()` succeeds, and log joins/leaves —
-your backend relays those to Gameye's player join/leave endpoints.
+Log a `READY port=7777` line once `StartServer()` succeeds, and log joins/leaves.
+Report joins/leaves and results to **your backend**, which relays them to Gameye's
+player join/leave endpoints — the server never holds a Gameye API token, and env
+values are readable by any `session:read` token in your organization, so only
+short-lived per-match values (a join secret) belong there. If you use warm pools,
+request env and args are ignored: fetch match config from your backend at boot
+instead (`gameye-server-design`).
+
+With **Unity Matchmaker**, the allocator is typically a Cloud Code module that calls
+`POST /session` when a match forms and hands the address back to players; the Gameye
+token lives on that server side, never in the client or game server
+(`gameye-matchmaking`).
 
 ## Shutdown
 
@@ -106,6 +95,10 @@ and wire it to both paths — signal-initiated quit and natural match end:
 Application.quitting += ReportResultsAndFlush;
 // on match end: ReportResultsAndFlush(); Application.Quit(0);
 ```
+
+Keep `ReportResultsAndFlush` fast: the essentials should be out within about 10
+seconds of SIGTERM, well inside the up-to-50-second window before the container is
+killed.
 
 Exiting after the match is the correct behavior (`gameye-server-design` explains
 why); don't return to a lobby scene.

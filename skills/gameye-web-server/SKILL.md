@@ -1,6 +1,8 @@
 ---
 name: gameye-web-server
 description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and containerization. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
+metadata:
+  version: "1.0.0"
 ---
 
 # Web game servers on Gameye
@@ -72,16 +74,17 @@ async function endMatch() {
 }
 process.on("SIGTERM", async () => {       // stop request / TTL: drain
   broadcast(wss, { type: "server-closing" });
-  await reportResults(MATCH_ID, state);
-  process.exit(0);
+  await reportResults(MATCH_ID, state);   // keep this under ~10s; the window
+  process.exit(0);                        // before SIGKILL is up to 50s
 });
 
 httpd.listen(PORT, "0.0.0.0", () => console.log(`READY port=${PORT}`));
 ```
 
 The load-bearing details: bind `0.0.0.0` on a fixed port; authenticate joins with a
-token your matchmaker minted (report joins/leaves onward to Gameye's player
-endpoints); heartbeat-reap dead sockets so `playerCount` stays honest and empty
+token your matchmaker minted (report joins/leaves to your backend, which relays them
+to Gameye's player endpoints — the server never holds a Gameye API token);
+heartbeat-reap dead sockets so `playerCount` stays honest and empty
 matches actually end; exit 0 on match end and on SIGTERM.
 
 ## TLS and mixed content — decide this early
@@ -93,9 +96,9 @@ Every browser game must pick one of:
 1. **Per-session DNS + wildcard cert** (the production pattern). Your allocator, on
    session start, creates a DNS A record `s-<sessionId>.play.yourgame.example` →
    session host IP (any DNS provider with an API; low TTL). The container holds a
-   wildcard certificate for `*.play.yourgame.example` — injected via env/secret or
-   fetched from your backend at boot (a deliberate, tiny exception to "no downloads
-   at boot") — and the Node server terminates TLS itself (`https.createServer` +
+   wildcard certificate for `*.play.yourgame.example` — fetched from your backend at
+   boot (a deliberate, tiny exception to "no downloads at boot"), never passed in
+   session `env`, which any `session:read` token in your organization can read — and the Node server terminates TLS itself (`https.createServer` +
    `WebSocketServer`). Clients connect
    `wss://s-<id>.play.yourgame.example:<hostPort>`. Automate cert renewal into image
    tags or the boot fetch.

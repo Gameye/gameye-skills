@@ -1,13 +1,15 @@
 ---
 name: gameye-local-testing
 description: Prove a game server container behaves identically on a laptop and on Gameye before deploying — parity docker runs, the forced port-asymmetry test, the SIGTERM drain test, boot timing, and the sandbox smoke test sequence. Use before any first deploy or new tag rollout, when a server works locally but fails on Gameye, or when the user mentions testing a game server container, docker run testing, or a Gameye sandbox smoke test.
+metadata:
+  version: "1.0.0"
 ---
 
 # Testing before you deploy
 
 Every failure mode this skill catches costs seconds locally and an opaque debugging
-session in production. Run the local battery on every meaningful change; run the
-sandbox smoke test before any tag reaches production traffic.
+session with live players. Run the local battery on every meaningful change; run the
+smoke test before any tag reaches real players.
 
 ## Parity run
 
@@ -49,13 +51,15 @@ works on a laptop with `-p 7777:7777` and loses every player in production.
 ## The drain test
 
 ```bash
-docker stop --time 20 mygame-test
+docker stop --time 50 mygame-test
 ```
 
 `docker stop` sends SIGTERM then SIGKILL after the grace period — the same shape as
-a Gameye stop request or TTL expiry. Verify from the logs that the handler ran:
-shutdown announced, results flushed, artifacts written, clean exit 0 *before* the
-deadline. If the container only dies at the SIGKILL, PID 1 isn't your server
+a Gameye stop request or TTL expiry, and `--time 50` mirrors the configured window of
+up to 50 seconds. Don't let the generous window hide a slow drain: verify from the
+timestamped logs (`docker logs -t`) that the handler ran and the essentials —
+results flushed, artifacts written — land **within about 10 seconds** of SIGTERM,
+followed by a clean exit 0 well before the deadline. If the container only dies at the SIGKILL, PID 1 isn't your server
 (missing `exec`, shell-form ENTRYPOINT, or `npm start` — see `gameye-containerize`)
 or the handler isn't wired.
 
@@ -79,21 +83,31 @@ resource-profile sizing (`gameye-containerize`).
 
 ## Sandbox smoke test
 
-With the tag pushed and the sandbox environment configured
-(`https://api.sandbox-gameye.gameye.net`, sandbox token — see `gameye-sessions-api`):
+With the tag pushed and the host and token configured — sandbox
+(`https://api.sandbox-gameye.gameye.net`) for self-serve customers, production for
+enterprise; see `gameye-sessions-api`. When you, the agent, run this sequence, use
+the `gameye_*` tools if you have them, otherwise HTTP, per the routing rule in the
+`gameye` skill's [references/routing.md](../gameye/references/routing.md). Ask before
+starting the session — it is billed.
 
 ```
 1. GET  /available-location/{image}          → your region is listed
 2. GET  /tag/{region}/{image}/{version}      → { "exists": true }  (preload done)
-3. POST /session   (env, args, ttl "15m")    → 201, note host + ports
+3. POST /session  (version pinned, env, args, ttl "15m", an agent/test label)
+                                             → 201; note id, host + ports from the response
 4. GET  /session/{id}                        → status reaches "running"
-5. GET  /logs?id=...                         → boot line + READY visible
+5. GET  /logs?id={id}&follow=false           → boot line + READY visible
 6. Connect a real client to host:hostPort    → gameplay works
-7. DELETE /session/{id}                      → drain visible in logs
-8. Poll describe → "exited", then GET /artifacts?id=...  → expected files
+7. DELETE /session/{id}                      → 204; drain visible in logs
+8. Poll describe until "exited", then
+   GET /artifacts?session={id}&path=/app/out → uncompressed tar with the expected files
 ```
 
-Automate this sequence in CI (the Unity path gets it built-in via
-`gameye-unity-bootstrap smoke-test`). A tag that passes it has proven the image, the
+Notes: without `follow=false` the logs request stays open until it times out. Use
+the session `id` from the start response (a warm pool replaces the one you sent).
+Artifacts need both `session` and `path`, return a plain tar (don't gunzip), and are
+only kept until the container is removed — fetch right after `exited`.
+
+Automate this sequence in CI with a short-lived token. A tag that passes it has proven the image, the
 registry integration, the port bindings, the config injection, the drain path, and
 the artifact pipeline — everything `gameye-launch` assumes.

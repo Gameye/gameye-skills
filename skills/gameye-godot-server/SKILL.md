@@ -1,6 +1,8 @@
 ---
 name: gameye-godot-server
 description: Produce a Godot 4 dedicated server build that runs on Gameye — the dedicated_server export feature, headless mode, high-level multiplayer with ENet or WebSocket, runtime configuration, and containerization specifics. Use whenever building or debugging a Godot multiplayer server, exporting a Godot headless Linux build, or when the user mentions Godot dedicated servers, ENetMultiplayerPeer, or hosting a Godot game on Gameye.
+metadata:
+  version: "1.0.0"
 ---
 
 # Godot 4 dedicated servers on Gameye
@@ -63,10 +65,14 @@ untrusted input), and never let a client set outcomes directly.
 
 - Config via env (`OS.get_environment`) as shown — that's what Gameye injects from
   the session-start call. Session `args` are also available via `OS.get_cmdline_args()`
-  if you prefer flag-style config.
+  if you prefer flag-style config. Env is readable by any `session:read` token in
+  your organization: only short-lived per-match values (a join secret) go there,
+  never a Gameye API token. Under warm pools request env and args are ignored, so
+  fetch match config from your backend at boot (`gameye-server-design`).
 - `print()` goes to stdout, which is exactly where the Gameye logs endpoint reads.
-  Log the boot config line, READY, joins/leaves (relay these to Gameye's player
-  join/leave endpoints via your backend), and the final result.
+  Log the boot config line, READY, joins/leaves, and the final result. Report
+  joins/leaves to your backend, which relays them to Gameye's player join/leave
+  endpoints — the server itself never calls Gameye.
 - Tick rates are explicit decisions: `Engine.physics_ticks_per_second` for the
   simulation, and set `Engine.max_fps` (e.g. to the tick rate) so the headless main
   loop doesn't spin a core flat out.
@@ -76,7 +82,8 @@ untrusted input), and never let a client set outcomes directly.
   `docker stop` — put it in one function wired to both the match-end path and
   `NOTIFICATION_WM_CLOSE_REQUEST` in `_notification()`, and confirm behavior with the
   drain test in `gameye-local-testing` rather than assuming the engine's signal
-  handling matches your Godot version.
+  handling matches your Godot version. Flush the essentials within about 10 seconds
+  of SIGTERM; the window before the container is killed is up to 50 seconds.
 
 ## Container specifics
 
