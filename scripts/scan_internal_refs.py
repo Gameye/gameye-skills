@@ -8,7 +8,7 @@ Flags (each hit prints `path:line: rule: excerpt`; exit code 1 if any):
                    C:\\Users\\<name>
   test-host        the local development API host (`gameye.test`) outside
                    test files
-  private-host     internal environments and hosts: planz-development, any
+  private-host     internal environments and hosts: planz / planz-dev / planz-development, any
                    `*.gameye.net` host other than the two public API hosts,
                    the internal GitLab group
   personal-email   gmail.com addresses and `@gameye.com` addresses other than
@@ -37,6 +37,9 @@ from dataclasses import dataclass
 from collections.abc import Callable, Iterator
 from pathlib import Path, PurePosixPath
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate_reference  # noqa: E402  (needs PyYAML, see requirements-dev.txt)
+
 ROOT = Path(__file__).resolve().parents[1]
 
 EXCLUDED_DIRS = {
@@ -49,18 +52,14 @@ EXCLUDED_FILES = {".DS_Store"}
 SELF_FILES = {
     "scripts/scan_internal_refs.py",
     "scripts/tests/test_scan_internal_refs.py",
-    "scripts/scan-internal-refs.mjs",
 }
 
 # (path, rule) pairs that are deliberate. Each needs a reason.
-ALLOWED_HITS = {
-    # gameye-mcp's package-content guard names the internal doc to forbid it.
-    ("scripts/check-pack.mjs", "internal-doc"),
-}
+ALLOWED_HITS: set[tuple[str, str]] = set()
 
 PUBLIC_GAMEYE_NET_HOSTS = {
-    "api.sandbox-gameye.gameye.net",
-    "api.production-gameye.gameye.net",
+    host.removeprefix("https://")
+    for host in (generate_reference.SANDBOX_HOST, generate_reference.PRODUCTION_HOST)
 }
 GENERIC_GAMEYE_MAILBOXES = {"support", "noreply", "no-reply"}
 GENERIC_HOME_USERS = {
@@ -98,10 +97,11 @@ RULES: list[tuple[str, re.Pattern[str], Callable[[re.Match[str]], bool] | None, 
     ("personal-path", re.compile(r"(?<![\w.-])/home/([A-Za-z0-9._-]+)"), _home, True),
     ("personal-path", re.compile(r"/Volumes/[A-Za-z0-9._-]+"), None, True),
     ("personal-path", re.compile(r"[A-Za-z]:\\+Users\\+[A-Za-z0-9._-]+"), None, True),
+    ("personal-path", re.compile(r"(?<![\w.])~/[A-Za-z]"), None, True),
     ("test-host", re.compile(r"\bgameye\.test\b", re.IGNORECASE), None, False),
-    ("private-host", re.compile(r"planz-development", re.IGNORECASE), None, True),
+    ("private-host", re.compile(r"\bplanz(?:-dev(?:elopment)?)?\b", re.IGNORECASE), None, True),
     ("private-host", re.compile(r"\b(?:[a-z0-9-]+\.)+gameye\.net\b", re.IGNORECASE), _gameye_net, True),
-    ("private-host", re.compile(r"gitlab\.com/gameye", re.IGNORECASE), None, True),
+    ("private-host", re.compile(r"gitlab\.com[:/]gameye", re.IGNORECASE), None, True),
     ("personal-email", re.compile(r"[A-Za-z0-9._%+-]+@gmail\.com", re.IGNORECASE), None, True),
     ("personal-email", re.compile(r"\b([A-Za-z0-9._%+-]+)@gameye\.com\b", re.IGNORECASE), _gameye_email, True),
     ("placeholder", re.compile(r"your-org\b", re.IGNORECASE), None, True),

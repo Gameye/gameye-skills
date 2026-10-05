@@ -79,3 +79,36 @@ def test_cli_on_seeded_tree(tmp_path: Path):
     result = run()
     assert result.returncode == 1
     assert "README.md:1: test-host" in result.stdout
+
+
+def test_gitlab_ssh_and_https_forms_fail():
+    assert rules("README.md", "git clone git@gitlab.com:gameye/core.git") == ["private-host"]
+    assert rules("README.md", "https://gitlab.com/gameye/core") == ["private-host"]
+    assert rules("README.md", "https://gitlab.com/other/core") == []
+
+
+def test_internal_env_names_fail():
+    assert rules("README.md", "deploy to planz-dev first") == ["private-host"]
+    assert rules("README.md", "planz-development cluster") == ["private-host"]
+    assert rules("README.md", "PLANZ is the cluster") == ["private-host"]
+    assert rules("README.md", "deploy to staging first") == []
+    assert rules("README.md", "the planzone tool") == []
+
+
+def test_home_relative_paths_fail():
+    assert rules("README.md", "cd ~/Projects/gameye/core") == ["personal-path"]
+    assert rules("README.md", "cd ~/projects/x") == ["personal-path"]
+    assert rules("README.md", "see ~/Library/Application Support") == ["personal-path"]
+    assert rules("README.md", "cd /srv/app and ls") == []
+    assert rules("README.md", "run it in the project dir") == []
+
+
+def test_public_hosts_derive_from_generate_reference():
+    import generate_reference as gen
+    assert gen.SANDBOX_HOST.removeprefix("https://") in scan.PUBLIC_GAMEYE_NET_HOSTS
+    assert gen.PRODUCTION_HOST.removeprefix("https://") in scan.PUBLIC_GAMEYE_NET_HOSTS
+
+
+def test_no_stale_allowlist_entries():
+    assert not any("mjs" in p for p in scan.SELF_FILES)
+    assert not any(path.endswith(".mjs") for path, _ in scan.ALLOWED_HITS)

@@ -20,12 +20,15 @@ import sys
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate_reference  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "spec"
 CLIENT_SNAPSHOT = SPEC / "client.yaml"
 WEBHOOK_SNAPSHOT = SPEC / "webhook.yaml"
 
-LIVE_CLIENT_URL = "https://api.sandbox-gameye.gameye.net/openapi.yaml"
+LIVE_CLIENT_URL = f"{generate_reference.SANDBOX_HOST}/openapi.yaml"
 CORE_BRANCH = "dev"
 CORE_WEBHOOK_PATH = "api/openapi/webhook.yaml"
 
