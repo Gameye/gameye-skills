@@ -17,7 +17,7 @@ Checks (each failure is collected; exit code 1 if any):
                (spec/overrides.yaml request-body overrides win).
   reference    the generated api-reference.md is current.
   manifests    .claude-plugin/marketplace.json and plugin.json parse; plugin.json
-               has no `version` (KTD7: updates track the commit SHA); the
+               has no `version` (updates track the commit SHA); the
                marketplace entry's source resolves to the repo root, which holds
                skills/, and lists no `skills` (that would disable default
                scanning); the bundled MCP server pins `gameye-mcp@<major>` and
@@ -93,7 +93,7 @@ HOST_RE = re.compile(r"\bapi\.[a-z0-9.-]*gameye[a-z0-9.-]*", re.IGNORECASE)
 # (pattern, explanation). Each match fails with file and line.
 BANNED_FACTS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"api\.gameye\.io", re.IGNORECASE), "`api.gameye.io` is not a Gameye API host"),
-    (re.compile(r"gameye-unity-bootstrap", re.IGNORECASE), "the Unity bootstrap CLI is out of scope (R10)"),
+    (re.compile(r"gameye-unity-bootstrap", re.IGNORECASE), "the Unity bootstrap CLI is unpublished; do not reference it"),
     (re.compile(r'"player"\s*:'), 'player bodies take `"players": [...]`, not a singular `"player"`'),
     (re.compile(r"/artifacts\?id=", re.IGNORECASE), "artifacts takes `session` and `path`, not `id`"),
     (re.compile(r"filter\[location\]", re.IGNORECASE),
@@ -344,7 +344,7 @@ def check_format(root: Path, errors: list[str]) -> list[Path]:
         if len(body.splitlines()) > BODY_MAX_LINES:
             errors.append(f"{where}: body over {BODY_MAX_LINES} lines; split into references/")
         if directory.name == PACK_SKILL and pack_version(text) is None:
-            errors.append(f"{where}: needs exactly one `Pack version: X.Y.Z` line (KTD9)")
+            errors.append(f"{where}: needs exactly one `Pack version: X.Y.Z` line (the pack version agents report)")
     return dirs
 
 
@@ -462,7 +462,7 @@ def check_manifests(root: Path, errors: list[str]) -> None:
             errors.append(f"{p}: `name` missing or not kebab-case")
         if "version" in plugin:
             errors.append(f"{p}: remove `version`; without it Claude Code updates track the "
-                          "commit SHA, and a forgotten bump can't block updates (KTD7)")
+                          "commit SHA, and a forgotten bump can't block updates")
         check_mcp_servers(plugin, p, errors)
 
     if market is not None:
@@ -480,7 +480,7 @@ def check_manifests(root: Path, errors: list[str]) -> None:
             errors.append(f"{m}: no plugin entry named {plugin_name!r} (must match plugin.json `name`)")
             return
         if "version" in entry:
-            errors.append(f"{m}: plugin entry {plugin_name!r} sets `version`; omit it (KTD7)")
+            errors.append(f"{m}: plugin entry {plugin_name!r} sets `version`; omit it")
         if "skills" in entry:
             errors.append(f"{m}: plugin entry {plugin_name!r} lists `skills`, which disables the "
                           "default skills/ scan; rely on skills/ instead")
@@ -519,7 +519,7 @@ def check_mcp_servers(plugin: dict, where: str, errors: list[str]) -> None:
         for package in packages:
             if not MCP_PIN_RE.match(package):
                 errors.append(f"{where}: mcpServers.{name} runs `{package}`; pin a major version "
-                              f"as `{MCP_PACKAGE}@<major>` (KTD8)")
+                              f"as `{MCP_PACKAGE}@<major>`")
         env = server.get("env") or {}
         if not isinstance(env, dict):
             errors.append(f"{where}: mcpServers.{name}.env must be an object")

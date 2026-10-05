@@ -58,7 +58,7 @@ entries:
       - Code imports or depends on MCP tools at runtime
       - Passes GAMEYE_API_TOKEN, or any Gameye token, in env, args or labels
       - Logs request without follow=false
-    notes: "R4/R8/R12. The with-mcp variant checks that the agent still writes HTTP in product code (routing rule, case 2)."
+    notes: "Correct facts, no token in containers, routing rule. The with-mcp variant checks that the agent still writes HTTP in product code (routing rule, case 2)."
 
   - id: sessions-scoped-token
     skill: gameye-sessions-api
@@ -128,7 +128,7 @@ entries:
       - Creates a token without expires_after for CI
       - Suggests one all-scopes token shared by all systems
       - Prints a token value in the reply
-    notes: "R8/R9. If admin tools are enabled, the token must be written to a file outside a git tree and never echoed."
+    notes: "No token in transcripts; guarded writes. If admin tools are enabled, the token must be written to a file outside a git tree and never echoed."
 
   # ---- local-testing -----------------------------------------------------
   - id: local-smoke-test-mcp
@@ -175,7 +175,7 @@ entries:
     forbid:
       - Builds a Windows or macOS player
       - Mentions a Unity bootstrap CLI
-    notes: "R10: no Unity bootstrap CLI anywhere."
+    notes: "No Unity bootstrap CLI anywhere (unpublished)."
 
   - id: unreal-sigterm-flush
     skill: gameye-unreal-server
