@@ -1,0 +1,354 @@
+# Server-vs-spec divergences for the Gameye client API.
+#
+# Authority: observed server behavior > spec/client.yaml > skill text.
+# Each entry records one place where the server does something the spec does
+# not say (or says wrongly), with the server source that proves it. Evidence
+# paths are in the Gameye core repository on its `dev` branch.
+#
+# Read by scripts/generate_reference.py (and, later, the validator and the
+# gameye-mcp parity test). After editing, regenerate the reference:
+#   python3 scripts/generate_reference.py
+#
+# Entry fields:
+#   operation   operationId in spec/client.yaml
+#   kind        scope | request-body | query-params | response | behavior
+#   fact        the corrected fact, as rendered in the reference notes
+#   spec_says   what the spec claims (omitted when the spec is silent)
+#   body        (request-body) replacement body summary for the reference
+#   params      (query-params) replacement query-parameter list
+#   scope       (scope) the scope the handler checks
+#   evidence    list of {file, function} in core `dev`
+
+# MCP tool names (gameye-mcp), keyed by operationId. admin_gated marks tools
+# that need an admin-level scope and should sit behind an explicit opt-in.
+tools:
+  session-run: {tool: gameye_launch_session}
+  session-list: {tool: gameye_list_sessions}
+  describe-session: {tool: gameye_describe_session}
+  session-stop: {tool: gameye_stop_session}
+  join-session: {tool: gameye_player_join}
+  leave-session: {tool: gameye_player_leave}
+  artifacts: {tool: gameye_get_artifacts}
+  stream-logs: {tool: gameye_get_logs}
+  create-token: {tool: gameye_create_token, admin_gated: true}
+  list-applications: {tool: gameye_list_applications}
+  create-application: {tool: gameye_create_application, admin_gated: true}
+  edit-application: {tool: gameye_edit_application, admin_gated: true}
+  enable-tag: {tool: gameye_enable_tag}
+  list-application-tags-upstream: {tool: gameye_list_registry_tags}
+  list-regions: {tool: gameye_list_regions}
+  get-available-locations: {tool: gameye_get_locations}
+  tag-exists: {tool: gameye_check_tag}
+
+overrides:
+  # ---------------------------------------------------------------- scopes
+  # The scope each handler passes to TokenAuth.Authenticate. Scopes are
+  # enforced only when the server runs with scoped tokens (EnableScopes);
+  # legacy V1 tokens skip the check (dbTokenAuth.Authenticate, auth.go).
+  - operation: session-run
+    kind: scope
+    scope: session:start
+    spec_says: session:start
+    fact: Server checks `session:start`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/run_session.go, function: RunSessionRoute.ServeHTTP}
+  - operation: session-list
+    kind: scope
+    scope: session:read
+    spec_says: session:read
+    fact: Server checks `session:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/list_session.go, function: ListSessionsRoute.ServeHTTP}
+  - operation: describe-session
+    kind: scope
+    scope: session:read
+    spec_says: session:read
+    fact: Server checks `session:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/describe_session.go, function: DescribeSessionRoute.ServeHTTP}
+  - operation: session-stop
+    kind: scope
+    scope: session:stop
+    spec_says: session:stop
+    fact: Server checks `session:stop`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/stop_session.go, function: StopSessionRoute.ServeHTTP}
+  - operation: join-session
+    kind: scope
+    scope: session:write
+    fact: Server checks `session:write`; the spec declares no security for this operation.
+    evidence:
+      - {file: internal/orchestrator/clientapi/join_session.go, function: JoinSessionRoute.ServeHTTP}
+  - operation: leave-session
+    kind: scope
+    scope: session:write
+    fact: Server checks `session:write`; the spec declares no security for this operation.
+    evidence:
+      - {file: internal/orchestrator/clientapi/leave_session.go, function: LeaveSessionRoute.ServeHTTP}
+  - operation: artifacts
+    kind: scope
+    scope: artifact:read
+    spec_says: artifact:read
+    fact: Server checks `artifact:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/artifacts.go, function: ArtifactsRoute.ServeHTTP}
+  - operation: stream-logs
+    kind: scope
+    scope: logs:read
+    spec_says: logs:read
+    fact: Server checks `logs:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/logs.go, function: LogsRoute.ServeHTTP}
+  - operation: create-token
+    kind: scope
+    scope: token:write
+    spec_says: token:write
+    fact: Server checks `token:write`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/create_token.go, function: CreateTokenRoute.ServeHTTP}
+  - operation: list-applications
+    kind: scope
+    scope: application:read
+    spec_says: application:read
+    fact: Server checks `application:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/list_applications.go, function: ListApplicationsRoute.ServeHTTP}
+  - operation: create-application
+    kind: scope
+    scope: application:write
+    spec_says: application:write
+    fact: Server checks `application:write`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/create_application.go, function: CreateApplicationRoute.ServeHTTP}
+  - operation: edit-application
+    kind: scope
+    scope: application:write
+    fact: Server checks `application:write`; the spec declares no security for this operation.
+    evidence:
+      - {file: internal/orchestrator/clientapi/edit_application.go, function: EditApplicationRoute.ServeHTTP}
+  - operation: enable-tag
+    kind: scope
+    scope: regions:read
+    spec_says: application:write
+    fact: Server checks `regions:read`, not the `application:write` the spec declares.
+    evidence:
+      - {file: internal/orchestrator/clientapi/tag_enable.go, function: TagEnableRoute.ServeHTTP}
+  - operation: list-application-tags-upstream
+    kind: scope
+    scope: application:read
+    spec_says: application:read
+    fact: Server checks `application:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/list_registry_tags.go, function: ListRegistryTagsRoute.ServeHTTP}
+  - operation: list-regions
+    kind: scope
+    scope: region:read
+    fact: Server checks `region:read` (singular); the spec declares no security for this operation.
+    evidence:
+      - {file: internal/orchestrator/clientapi/list_regions.go, function: ListRegionsRoute.ServeHTTP}
+  - operation: get-available-locations
+    kind: scope
+    scope: regions:read
+    spec_says: regions:read
+    fact: Server checks `regions:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/available_locations.go, function: AvailableLocationsRoute.ServeHTTP}
+  - operation: tag-exists
+    kind: scope
+    scope: regions:read
+    spec_says: regions:read
+    fact: Server checks `regions:read`.
+    evidence:
+      - {file: internal/orchestrator/clientapi/tag_exists.go, function: TagExistsRoute.ServeHTTP}
+
+  # ------------------------------------------------------- players
+  - operation: join-session
+    kind: response
+    spec_says: "`players` is the list of player IDs that joined."
+    fact: >-
+      Response `players` is every player now in the session (not only the ones
+      just joined) and `count` is its length. Joining is per session ID; an
+      unknown or foreign session returns 404.
+    evidence:
+      - {file: internal/orchestrator/clientapi/join_session.go, function: JoinSessionRoute.ServeHTTP}
+      - {file: internal/storage/player.go, function: PlayerDbStore.Join}
+  - operation: leave-session
+    kind: request-body
+    spec_says: "Body is `{players}`; no session field."
+    body: "{session: string, players: string[]}"
+    fact: >-
+      Body must include `session`: the handler decodes the join body
+      `{session, players}` and looks the session up by it, so omitting it
+      returns 404.
+    evidence:
+      - {file: internal/orchestrator/clientapi/leave_session.go, function: LeaveSessionRoute.ServeHTTP}
+      - {file: internal/storage/player.go, function: PlayerDbStore.Leave}
+  - operation: leave-session
+    kind: response
+    spec_says: "`players` is the list of player IDs that left."
+    fact: >-
+      Response `players` is the players remaining in the session and `count` is
+      its length; `players` is `null` (not `[]`) when the session is empty.
+    evidence:
+      - {file: internal/orchestrator/clientapi/leave_session.go, function: LeaveSessionRoute.ServeHTTP}
+      - {file: internal/storage/player.go, function: PlayerDbStore.Leave}
+
+  # ------------------------------------------------ logs and artifacts
+  - operation: artifacts
+    kind: query-params
+    params:
+      - {name: session, required: true}
+      - {name: path, required: true}
+    fact: >-
+      Query params are `session` (the session ID, not `id`) and `path` (a path
+      inside the container), both required.
+    evidence:
+      - {file: internal/orchestrator/clientapi/artifacts.go, function: ArtifactsRoute.ServeHTTP}
+  - operation: artifacts
+    kind: response
+    spec_says: "`application/x-tar`, a download in .tar.gz format."
+    fact: >-
+      Returns an uncompressed tar stream (Docker `CopyFromContainer` output)
+      with `Content-Type: application/octet-stream` and
+      `Content-Disposition: attachment; filename="<session>.tar"`. Do not gunzip.
+    evidence:
+      - {file: internal/orchestrator/clientapi/artifacts.go, function: ArtifactsRoute.ServeHTTP}
+      - {file: internal/orchestrator/agent/client.go, function: defaultClient.GetArtifact}
+      - {file: internal/agent/api/service.go, function: Service.FetchArtifact}
+  - operation: stream-logs
+    kind: behavior
+    spec_says: "`follow` is optional with no stated default."
+    fact: >-
+      `follow` defaults to `true`: the stream stays open until the client
+      disconnects or the request timeout. Pass `follow=false` to get the logs
+      written so far and close.
+    evidence:
+      - {file: internal/orchestrator/clientapi/logs.go, function: LogsRoute.ServeHTTP}
+
+  # ------------------------------------------------------- sessions
+  - operation: session-list
+    kind: query-params
+    spec_says: "`filter` is a deepObject of tags; no `filterNot`."
+    params:
+      - {name: all, required: false}
+      - {name: location, required: false}
+      - {name: image, required: false}
+      - {name: tag, required: false}
+      - {name: host, required: false}
+      - {name: "playerCount[lt]", required: false}
+      - {name: "playerCount[gt]", required: false}
+      - {name: "filter[<key>]", required: false}
+      - {name: "filterNot[<key>]", required: false}
+    fact: >-
+      Without `all=true` only running sessions are returned. `location`,
+      `image`, `tag` and `host` are plain exact-match params. `playerCount[lt]`
+      and `playerCount[gt]` are strict. `filter[k]=v` and `filterNot[k]=v` match
+      only the user labels set at launch (the `tags` label), never env or
+      system labels; a session that lacks key `k` fails both, so `filterNot`
+      does not return unlabeled sessions.
+    evidence:
+      - {file: internal/orchestrator/clientapi/list_session.go, function: ListSessionsRoute.extractSessionListFilters}
+      - {file: internal/orchestrator/clientapi/list_session.go, function: ListSessionsRoute.applySessionListFilters}
+      - {file: internal/orchestrator/clientapi/list_session.go, function: ListSessionsRoute.matchesLabelFilters}
+  - operation: session-list
+    kind: response
+    spec_says: "`labels` is user-defined key/value metadata."
+    fact: >-
+      `labels` holds the raw container labels: `tags` (user labels, JSON),
+      `env` (the full launch environment, JSON) and `gameye` (system labels,
+      JSON). Any token in your organization with `session:read` can read launch
+      env values. Never pass a Gameye API token or long-lived credentials
+      through session env; short-lived per-match values such as a join secret
+      are acceptable.
+    evidence:
+      - {file: internal/agent/container/label.go, function: RootLabelMap.SetEnvLabels}
+      - {file: internal/agent/container/start.go, function: DockerStarter.Start}
+      - {file: internal/orchestrator/clientapi/list_session.go, function: ListSessionsRoute.ServeHTTP}
+  - operation: describe-session
+    kind: response
+    spec_says: "`labels` is user-defined key/value metadata."
+    fact: >-
+      `labels` holds the raw container labels: `tags` (user labels, JSON),
+      `env` (the full launch environment, JSON) and `gameye` (system labels,
+      JSON). Any token in your organization with `session:read` can read launch
+      env values. Never pass a Gameye API token or long-lived credentials
+      through session env; short-lived per-match values such as a join secret
+      are acceptable.
+    evidence:
+      - {file: internal/agent/container/label.go, function: RootLabelMap.SetEnvLabels}
+      - {file: internal/orchestrator/clientapi/describe_session.go, function: DescribeSessionRoute.ServeHTTP}
+  - operation: session-run
+    kind: behavior
+    spec_says: "If version is not specified, run the tag with the highest priority."
+    fact: >-
+      Omitting `version` runs the most recently registered tag for the
+      application (tags ordered by `created_at` descending); there is no tag
+      priority.
+    evidence:
+      - {file: internal/orchestrator/scheduling/allocate.go, function: DefaultAllocator.RequestedVersionOrMostRecent}
+      - {file: internal/storage/application.go, function: dbApplicationStore.ListOrderedTags}
+  - operation: session-run
+    kind: behavior
+    spec_says: "Warm pool ignores request args/env/labels; if exhausted, a cold allocation occurs as normal."
+    fact: >-
+      When a warm pool is enabled for the image and region, request `env`,
+      `args` and `labels` are ignored even when the pool is exhausted (the cold
+      fallback uses the pool's configured env, args and labels). A claimed warm
+      container also ignores `version`, `restart` and `id`: the response `id` is
+      the warm container's name, so always read the session ID from the response.
+      `ttl` and `external_id` are honored.
+    evidence:
+      - {file: internal/orchestrator/scheduling/allocate.go, function: DefaultAllocator.Allocate}
+  - operation: session-run
+    kind: response
+    spec_says: "Documents 201, 401, 402, 403, 404, 409, 420, 422; no 429."
+    fact: >-
+      Returns 429 when an organization quota is exceeded, with `X-Quota-Type`
+      and `X-Quota-Limit` headers. Also 402 when a trial quota is exhausted and
+      420 when no compute is available (retry later).
+    evidence:
+      - {file: internal/orchestrator/clientapi/run_session.go, function: RunSessionRoute.handleAllocationError}
+
+  # ------------------------------------------------------- tokens
+  - operation: create-token
+    kind: behavior
+    fact: >-
+      With scoped tokens, requested `scopes` must be a subset of the caller's
+      own scopes (403 otherwise); `webhook:github` is the one scope a
+      `token:write` caller may delegate without holding it. Omitting
+      `expires_after` creates a non-expiring token.
+    evidence:
+      - {file: internal/orchestrator/clientapi/create_token.go, function: CreateTokenRoute.ServeHTTP}
+
+# Webhook routes (spec/webhook.yaml), keyed by operationId. The webhook spec
+# is copied from core because no host serves it; these entries add the
+# server-checked credential and the setup facts the spec leaves implicit.
+webhooks:
+  v1-dockerhub-webhook:
+    scope: webhook:dockerhub
+    fact: >-
+      Basic auth, but only the password is read and authenticated as a token
+      with the `webhook:dockerhub` scope; the username is ignored. Docker Hub
+      webhooks cannot set headers, so put the token in the URL:
+      `https://anything:<TOKEN>@<host>/v1/integrations/dockerhub`.
+      204 when the tag was registered; 404 when no application uses the repository.
+    evidence:
+      - {file: internal/orchestrator/webhookapi/service.go, function: Service.DockerhubWebhook}
+      - {file: internal/orchestrator/webhookapi/auth.go, function: ExtractBasicAuthCredentials}
+  v1-github-webhook:
+    scope: webhook:github
+    fact: >-
+      No bearer or basic auth: GitHub signs the raw body with HMAC-SHA256 and
+      sends `X-Hub-Signature-256: sha256=<hex>`; the server tries every active
+      `webhook:github` token of the organization in the path as the key. In
+      GitHub set the payload URL to
+      `https://<host>/v1/integrations/github/<organization_id>`, content type
+      `application/json`, the secret to a `webhook:github` token, and select the
+      Packages event. Only `package` events with action `published` for
+      container packages register a tag (204); ping and other events get 200.
+      The route is mounted only where the GitHub integration is enabled.
+    evidence:
+      - {file: internal/orchestrator/webhookapi/github.go, function: parseGithubSignature}
+      - {file: internal/orchestrator/webhookapi/github.go, function: Service.handleGithubWebhook}
+      - {file: internal/orchestrator/webhookapi/signature_auth.go, function: dbSignatureAuth.VerifyGithubSignature}
+      - {file: internal/orchestrator/webhookapi/service.go, function: RegisterRoutes}

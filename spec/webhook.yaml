@@ -1,0 +1,361 @@
+openapi: 3.0.0
+info:
+  title: Gameye Webhook API
+  version: 1.0.0
+
+servers:
+  - url: https://api.sandbox-gameye.gameye.net
+    description: The main sandbox environment.
+  - url: https://api.production-gameye.gameye.net
+    description: The main production environment.
+
+paths:
+  /v1/integrations/dockerhub:
+    post:
+      operationId: v1-dockerhub-webhook
+      security:
+      - credentials: ['webhook:dockerhub']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Payload'
+
+      responses:
+        204:
+          description: |
+            The tag has successfully been registered to all applications associated with this repository.
+
+        400:
+          description: |
+            Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        401:
+          description: |
+            You are not authorized to perform this request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        403:
+          description: >
+            Your API token may not have the required permissions to invoke this endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: |
+            No applications are associated with the given repository.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/integrations/github/{organization_id}:
+    post:
+      operationId: v1-github-webhook
+      description: >
+        Receives GitHub 'package' webhook events for images pushed to the GitHub
+        Container Registry. Authentication is NOT bearer/basic: GitHub signs the
+        raw request body with HMAC-SHA256 using the webhook secret (a Gameye API
+        token with the 'webhook:github' scope) and sends the result in the
+        X-Hub-Signature-256 header. The organization_id path parameter selects
+        which organization's webhook tokens are candidate HMAC keys.
+      parameters:
+        - name: organization_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          schema:
+            type: string
+          description: HMAC-SHA256 signature of the raw request body.
+        - name: X-GitHub-Event
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/GithubPackagePayload'
+                - $ref: '#/components/schemas/GithubPingPayload'
+
+      responses:
+        204:
+          description: |
+            The tag has been registered to at least one GHCR application associated with this repository.
+
+        200:
+          description: |
+            The event was acknowledged but did not register a tag (ping event, ignored event type or action, non-container package, untagged push, or a tag that was already registered).
+
+        400:
+          description: |
+            Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        401:
+          description: |
+            The request signature is missing, malformed, or does not match any active webhook token for this organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: |
+            No GHCR applications are associated with the given repository.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        413:
+          description: |
+            The request body exceeds the maximum accepted size.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dockerhub:
+    post:
+      operationId: dockerhub-webhook
+      deprecated: true
+      security:
+      - credentials: ['webhook:dockerhub']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Payload'
+
+      responses:
+        204:
+          description: |
+            The tag has successfully been registered to all applications associated with this repository.
+
+        400:
+          description: |
+            Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        401:
+          description: |
+            You are not authorized to perform this request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: |
+            No applications are associated with the given repository.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    credentials:
+      type: http
+      scheme: basic
+      
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - code
+        - message
+        - details
+        - path
+        - identifier
+        - timestamp
+      properties:
+        statusCode:
+          type: integer
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: string
+        path:
+          type: string
+        timestamp:
+          type: string
+        identifier:
+          type: string
+
+    Repository:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - namespace
+      - repo_name
+      - repo_url
+      - description
+      - full_description
+      - star_count
+      - is_private
+      - is_trusted
+      - is_official
+      - owner
+      - date_created
+      properties:
+        status:
+          type: string
+        namespace:
+          type: string
+        repo_name:
+          type: string
+        repo_url:
+          type: string
+        description:
+          type: string
+        full_description:
+          type: string
+        star_count:
+          type: integer
+        is_private:
+          type: boolean
+        is_trusted:
+          type: boolean
+        is_official:
+          type: boolean
+        owner:
+          type: string
+        date_created:
+          type: integer
+
+    PushData:
+      type: object
+      additionalProperties: false
+      required:
+      - pusher
+      - pushed_at
+      - tag
+      - images
+      - media_type
+      properties:
+        pusher:
+          type: string
+        pushed_at:
+          type: integer
+        tag:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        media_type:
+          type: string
+
+    Payload:
+      type: object
+      additionalProperties: false
+      required:
+      - callback_url
+      - push_data
+      - repository
+      properties:
+        callback_url:
+          type: string
+        push_data:
+          $ref: '#/components/schemas/PushData'
+        repository:
+          $ref: '#/components/schemas/Repository'
+
+    # GitHub 'package' webhook event. Only the fields we read are modelled and
+    # additionalProperties stays open: GitHub payloads are large and evolve.
+    # Nested objects are optional on purpose — digest-only publications omit the
+    # container tag entirely.
+    GithubPackageOwner:
+      type: object
+      required:
+      - login
+      properties:
+        login:
+          type: string
+
+    GithubContainerTag:
+      type: object
+      properties:
+        name:
+          type: string
+
+    GithubContainerMetadata:
+      type: object
+      properties:
+        tag:
+          $ref: '#/components/schemas/GithubContainerTag'
+
+    GithubPackageVersion:
+      type: object
+      properties:
+        container_metadata:
+          $ref: '#/components/schemas/GithubContainerMetadata'
+
+    GithubPackage:
+      type: object
+      required:
+      - name
+      - package_type
+      - owner
+      properties:
+        name:
+          type: string
+        package_type:
+          type: string
+        owner:
+          $ref: '#/components/schemas/GithubPackageOwner'
+        package_version:
+          $ref: '#/components/schemas/GithubPackageVersion'
+
+    GithubPackagePayload:
+      type: object
+      required:
+      - action
+      - package
+      properties:
+        action:
+          type: string
+        package:
+          $ref: '#/components/schemas/GithubPackage'
+
+    GithubPingPayload:
+      type: object
+      required:
+        - zen
+      properties:
+        zen:
+          type: string
+
+externalDocs:
+  url: https://docs.gameye.com
