@@ -10,7 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so validate_skills.py can diff against origin/$GITHUB_BASE_REF.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: python3 -m pytest scripts/tests
+      - run: python3 scripts/generate_reference.py --check
       - run: python3 scripts/validate_skills.py
