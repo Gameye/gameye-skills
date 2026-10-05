@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -255,11 +256,14 @@ def test_body_change_with_all_bumps_passes(repo: Path) -> None:
     assert run(repo, env={"GITHUB_BASE_REF": "main"}) == []
 
 
-def test_frontmatter_only_change_needs_no_bump(repo: Path) -> None:
+def test_description_only_change_needs_bumps(repo: Path) -> None:
     write(repo, "skills/gameye-sessions-api/SKILL.md",
           (repo / "skills/gameye-sessions-api/SKILL.md").read_text().replace(
               "description: Use", "description: Please use"))
-    assert run(repo, env={"GITHUB_BASE_REF": "main"}) == []
+    versioning = [e for e in run(repo, env={"GITHUB_BASE_REF": "main"}) if e.startswith("versioning:")]
+    assert any("metadata.version" in e for e in versioning)
+    assert any("CHANGELOG.md" in e for e in versioning)
+    assert any("pack version" in e for e in versioning)
 
 
 def test_missing_base_ref_fails_loudly(repo: Path) -> None:
@@ -380,3 +384,228 @@ def test_literal_token_fails(tree: Path) -> None:
 def test_undeclared_user_config_fails(tree: Path) -> None:
     edit_json(tree, PLUGIN, lambda d: d["userConfig"].pop("gameye_env"))
     assert any("undeclared `userConfig.gameye_env`" in e for e in manifest_errors(tree))
+
+
+# ============================================================ review fixes
+# #5 banned facts and the single-error host rule
+
+@pytest.mark.parametrize("text", [
+    "Run `npx gameye-unreal-bootstrap init`.",
+    "```bash\nnpx gameye-unreal-bootstrap init\n```",
+    "Run your match on Gameye Rooms.",
+    "Try gameye rooms for lobbies.",
+])
+def test_unreal_bootstrap_and_rooms_banned(tree: Path, text: str) -> None:
+    add_skill_body(tree, text)
+    assert any(e.startswith("banned:") for e in run(tree)), text
+
+
+def test_banned_host_reported_exactly_once(tree: Path) -> None:
+    add_skill_body(tree, "Call https://api.gameye.io/session today.")
+    errors = [e for e in run(tree) if "api.gameye.io" in e]
+    assert len(errors) == 1, errors
+
+
+# #1 endpoint detection
+
+def fence(lang: str, code: str) -> str:
+    return f"```{lang}\n{code}\n```"
+
+
+@pytest.mark.parametrize("body, needle", [
+    ("Start with POST `/sessions/start`.", "/sessions/start"),
+    ("Tail with GET /logs?session=abc&tail=100.", "tail"),
+    ("Stop all with DELETE /session/everything.", "everything"),
+    (fence("bash", 'curl -X DELETE "$GAMEYE_API_URL/nonexistent/thing"'), "/nonexistent/thing"),
+    (fence("typescript", 'await gameye("/session/players/add", { method: "PUT" });'), "/session/players/add"),
+    (fence("ts", 'await gameye("/session/player/join");'), "GET /session/player/join"),  # default GET
+    (fence("js", "await fetch('/regions');"), "/regions"),
+])
+def test_endpoint_probes_fail(tree: Path, body: str, needle: str) -> None:
+    add_skill_body(tree, body)
+    errors = [e for e in run(tree) if e.startswith("endpoint:")]
+    assert any(needle in e for e in errors), (body, errors)
+
+
+def test_unknown_query_keys_each_reported(tree: Path) -> None:
+    add_skill_body(tree, "Tail with GET /logs?session=abc&tail=100.")
+    errors = [e for e in run(tree) if e.startswith("endpoint:")]
+    assert any("`session`" in e for e in errors) and any("`tail`" in e for e in errors), errors
+
+
+def test_word_literal_reports_ambiguous(tree: Path) -> None:
+    add_skill_body(tree, "Stop all with DELETE /session/everything.")
+    assert any("ambiguous literal path" in e for e in run(tree))
+
+
+@pytest.mark.parametrize("body", [
+    "Start with POST `/session`.",
+    "Join with PUT `/session/player/join`.",
+    fence("bash", 'curl -X POST "$GAMEYE_API_URL/session" \\\n  -H "Authorization: Bearer $T"'),
+    fence("bash", "curl -X GET 'https://api.sandbox-gameye.gameye.net/region'"),
+    fence("typescript", 'await gameye("/session/player/join", {\n  method: "PUT",\n'
+                        '  body: JSON.stringify({ session: s, players: ids }),\n});'),
+    fence("typescript", "const s = await (await gameye(`/session/${id}`)).json();"),
+    fence("typescript", "await gameye(`/logs?id=${encodeURIComponent(sessionId)}&follow=false`);"),
+    fence("js", 'await fetch("/session", { method: "POST", body: JSON.stringify({ image: "x", location: "eu" }) });'),
+    "GET /session?filter[match-id]=x&filterNot[mode]=y&playerCount[lt]=16&location=eu",
+    "GET /artifacts?session=<session-id>&path=/app/out",
+    "GET /logs?id={id}&follow=false",
+    "GET /session/match-42",
+    "GET /session/:id",
+    "GET /session/${id}",
+    "GET /session/c5c7c507-f5de-443e-b772-af4b444cfc21",
+])
+def test_endpoint_good_forms_pass(tree: Path, body: str) -> None:
+    add_skill_body(tree, body)
+    assert run(tree) == [], body
+
+
+# #3 JSON bodies
+
+@pytest.mark.parametrize("lang", ["jsonc", "json5", "JSON"])
+def test_json_fence_variants_checked(tree: Path, lang: str) -> None:
+    add_skill_body(tree, "POST /session\n\n" + fence(lang, '{ "sessionId": "x", "region": "eu" } // c'))
+    errors = [e for e in run(tree) if e.startswith("json-body:")]
+    assert any('"sessionId"' in e for e in errors) and any('"region"' in e for e in errors), errors
+
+
+def test_join_players_objects_fail(tree: Path) -> None:
+    add_skill_body(tree, "PUT /session/player/join\n\n"
+                   + fence("json", '{"session":"s","players":[{"name":"p","token":"abc"}]}'))
+    errors = [e for e in run(tree) if e.startswith("json-body:")]
+    assert any('"players"' in e and "string" in e for e in errors), errors
+
+
+def test_curl_data_bogus_field_fails(tree: Path) -> None:
+    add_skill_body(tree, fence("bash", 'curl -X POST "$GAMEYE_API_URL/session" -d \'{"image":"x","bogusField":1}\''))
+    errors = [e for e in run(tree) if e.startswith("json-body:")]
+    assert any('"bogusField"' in e for e in errors), errors
+
+
+def test_curl_multiline_data_good_passes(tree: Path) -> None:
+    add_skill_body(tree, fence("sh", 'curl -X PUT "$GAMEYE_API_URL/session/player/join" \\\n'
+                               '  -H "Content-Type: application/json" \\\n'
+                               '  --data \'{"session": "s", "players": ["p"]}\''))
+    assert run(tree) == []
+
+
+def test_json_stringify_unknown_key_fails(tree: Path) -> None:
+    add_skill_body(tree, fence("typescript", 'await gameye("/session", {\n  method: "POST",\n'
+                               '  body: JSON.stringify({ image: "x", location: "eu", region: "eu" }),\n});'))
+    errors = [e for e in run(tree) if e.startswith("json-body:")]
+    assert any('"region"' in e for e in errors), errors
+
+
+def test_nested_object_keys_checked(tree: Path) -> None:
+    add_skill_body(tree, "POST /application\n\n" + fence(
+        "json", '{ "name": "a", "limits": { "cpu": 1, "ram": 2, "disk": 3 },'
+                ' "ports": [ { "requested": 7777, "protocol": "udp", "tls": false, "bogus": 1 } ] }'))
+    errors = [e for e in run(tree) if e.startswith("json-body:")]
+    assert any('"limits.disk"' in e for e in errors) and any('"ports[].bogus"' in e for e in errors), errors
+
+
+def test_nested_known_keys_pass(tree: Path) -> None:
+    add_skill_body(tree, "POST /application\n\n" + fence(
+        "json", '{ "name": "a", "limits": { "cpu": 1, "ram": 2 },'
+                ' "ports": [ { "requested": 7777, "protocol": "udp" } ] }'))
+    assert run(tree) == []
+
+
+def test_unparseable_request_body_fails(tree: Path) -> None:
+    add_skill_body(tree, "POST /session\n\n" + fence("json", '{ "image": "x", oops oops'))
+    assert any(e.startswith("json-body:") and "cannot parse" in e for e in run(tree))
+
+
+def test_real_sessions_sketch_passes(tree: Path) -> None:
+    # The client sketch shape agents copy: comments, shorthand keys, member expressions.
+    add_skill_body(tree, fence("typescript", """const res = await gameye("/session", {
+  method: "POST",
+  body: JSON.stringify({
+    id, location, image: "my-game-server",
+    version: process.env.GAME_VERSION,            // pin
+    env: { MATCH_ID: matchId },
+    labels: { "match-id": matchId },
+    external_id: matchId,
+    ttl: "2h",
+  }),
+});"""))
+    assert run(tree) == []
+
+
+# #4 versioning covers references/, descriptions, spec inputs, added and deleted skills
+
+def versioning_errors(root: Path) -> list[str]:
+    return [e for e in run(root, env={"GITHUB_BASE_REF": "main"}) if e.startswith("versioning:")]
+
+
+def bump_skill(root: Path, name: str, version: str) -> None:
+    path = root / f"skills/{name}/SKILL.md"
+    text = path.read_text()
+    path.write_text(re.sub(r'version: "[^"]*"', f'version: "{version}"', text, count=1))
+
+
+def test_references_only_change_without_bump_fails(repo: Path) -> None:
+    write(repo, "skills/gameye-sessions-api/references/notes.md", "- New fact about sessions.\n")
+    errors = versioning_errors(repo)
+    assert any("metadata.version" in e and "gameye-sessions-api" in e for e in errors), errors
+    assert any("CHANGELOG.md" in e for e in errors)
+    assert any("pack version" in e for e in errors)
+
+
+def test_references_change_with_all_bumps_passes(repo: Path) -> None:
+    write(repo, "skills/gameye-sessions-api/references/notes.md", "- New fact about sessions.\n")
+    bump_skill(repo, "gameye-sessions-api", "1.0.1")
+    bump_pack(repo)
+    write(repo, "CHANGELOG.md", "# Changelog\n\n## 1.1.0\n- notes\n")
+    assert versioning_errors(repo) == []
+
+
+def test_overrides_change_without_sessions_bump_fails(repo: Path) -> None:
+    path = repo / "spec/overrides.yaml"
+    path.write_text(path.read_text() + "\n# comment that still changes the fact source\n")
+    errors = versioning_errors(repo)
+    assert any("metadata.version" in e and "gameye-sessions-api" in e for e in errors), errors
+    assert any("CHANGELOG.md" in e for e in errors)
+    assert any("pack version" in e for e in errors)
+
+
+@pytest.mark.parametrize("spec_file", ["client.yaml", "webhook.yaml"])
+def test_spec_change_counts_as_sessions_change(repo: Path, spec_file: str) -> None:
+    path = repo / "spec" / spec_file
+    path.write_text(path.read_text() + "\n# touched\n")
+    assert any("gameye-sessions-api" in e for e in versioning_errors(repo))
+
+
+def test_new_skill_requires_changelog_and_pack_bump(repo: Path) -> None:
+    write(repo, "skills/gameye-new/SKILL.md", skill_text("gameye-new", "# New\n\nBody."))
+    errors = versioning_errors(repo)
+    assert any("CHANGELOG.md" in e for e in errors), errors
+    assert any("pack version" in e for e in errors)
+    bump_pack(repo)
+    write(repo, "CHANGELOG.md", "# Changelog\n\n## 1.1.0\n- new skill\n")
+    assert versioning_errors(repo) == []
+
+
+def test_deleted_skill_handled(repo: Path) -> None:
+    write(repo, "skills/gameye-extra/SKILL.md", skill_text("gameye-extra", "# Extra\n\nBody."))
+    write(repo, "skills/gameye-extra/references/x.md", "x\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "extra")
+    git(repo, "update-ref", "refs/remotes/origin/main", git(repo, "rev-parse", "HEAD"))
+    shutil.rmtree(repo / "skills/gameye-extra")
+    errors = versioning_errors(repo)
+    assert any("CHANGELOG.md" in e and "gameye-extra" in e for e in errors), errors
+    bump_pack(repo)
+    write(repo, "CHANGELOG.md", "# Changelog\n\n## 1.1.0\n- removed extra\n")
+    assert versioning_errors(repo) == []
+
+
+def test_pack_version_only_edit_is_not_a_change(repo: Path) -> None:
+    bump_pack(repo)
+    assert versioning_errors(repo) == []
+
+
+def test_metadata_version_only_bump_is_not_a_change(repo: Path) -> None:
+    bump_skill(repo, "gameye-sessions-api", "1.0.1")
+    assert versioning_errors(repo) == []
