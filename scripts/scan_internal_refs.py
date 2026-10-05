@@ -30,9 +30,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass
+from collections.abc import Callable, Iterator
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,7 +93,7 @@ def _home(match: re.Match[str]) -> bool:
 
 
 # (rule, pattern, predicate or None, applies in test files)
-RULES: list[tuple[str, re.Pattern[str], object, bool]] = [
+RULES: list[tuple[str, re.Pattern[str], Callable[[re.Match[str]], bool] | None, bool]] = [
     ("personal-path", re.compile(r"/Users/[A-Za-z0-9._-]+"), None, True),
     ("personal-path", re.compile(r"(?<![\w.-])/home/([A-Za-z0-9._-]+)"), _home, True),
     ("personal-path", re.compile(r"/Volumes/[A-Za-z0-9._-]+"), None, True),
@@ -127,7 +129,7 @@ def scan_text(rel: str, text: str) -> list[Hit]:
             if in_test and not in_tests:
                 continue
             for match in pattern.finditer(line):
-                if predicate is not None and not predicate(match):  # type: ignore[operator]
+                if predicate is not None and not predicate(match):
                     continue
                 if (rel, rule) in ALLOWED_HITS:
                     continue
@@ -135,14 +137,17 @@ def scan_text(rel: str, text: str) -> list[Hit]:
     return hits
 
 
-def iter_files(root: Path):
-    for path in sorted(root.rglob("*")):
-        rel_parts = path.relative_to(root).parts
-        if any(part in EXCLUDED_DIRS for part in rel_parts[:-1]):
-            continue
-        if path.is_dir() or path.name in EXCLUDED_FILES or path.is_symlink():
-            continue
-        yield path
+def iter_files(root: Path) -> Iterator[Path]:
+    # Prune excluded directories so node_modules, .git and the like are never walked.
+    files: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS]
+        for name in filenames:
+            path = Path(dirpath) / name
+            if name in EXCLUDED_FILES or path.is_symlink():
+                continue
+            files.append(path)
+    yield from sorted(files)
 
 
 def read_text(path: Path) -> str | None:

@@ -81,10 +81,13 @@ PACK_SKILL = "gameye"
 PACK_VERSION_RE = re.compile(r"^Pack version: (\d+\.\d+\.\d+)[ \t]*$", re.MULTILINE)
 CHANGELOG = "CHANGELOG.md"
 
-GENERATED_REFERENCE = Path("skills/gameye-sessions-api/references/api-reference.md")
+GENERATED_REFERENCE = generate_reference.OUTPUT.relative_to(generate_reference.ROOT)
 REGENERATE_COMMAND = generate_reference.COMMAND
 
-ALLOWED_HOSTS = frozenset({"api.sandbox-gameye.gameye.net", "api.production-gameye.gameye.net"})
+ALLOWED_HOSTS = frozenset(
+    url.split("://", 1)[1] for url in (generate_reference.SANDBOX_HOST, generate_reference.PRODUCTION_HOST)
+)
+SKILL_REF_RE = re.compile(r"`(gameye(?:-[a-z0-9]+)*)`")
 HOST_RE = re.compile(r"\bapi\.[a-z0-9.-]*gameye[a-z0-9.-]*", re.IGNORECASE)
 
 # (pattern, explanation). Each match fails with file and line.
@@ -97,7 +100,6 @@ BANNED_FACTS: list[tuple[re.Pattern[str], str]] = [
      "`location` is a plain query param; `filter[k]` matches only launch labels"),
 ]
 
-METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 # METHOD, optional host prefix (URL, ${VAR}, $VAR, <host>), then the path.
 ENDPOINT_RE = re.compile(
     r"\b(GET|POST|PUT|DELETE|PATCH)[ \t]+"
@@ -306,7 +308,8 @@ def check_format(root: Path, errors: list[str]) -> list[Path]:
         if not skill_md.is_file():
             errors.append(f"format: {rel}: missing SKILL.md")
             continue
-        data, body, problem = split_frontmatter(skill_md.read_text(encoding="utf-8"))
+        text = skill_md.read_text(encoding="utf-8")
+        data, body, problem = split_frontmatter(text)
         where = f"format: {rel}/SKILL.md"
         if problem:
             errors.append(f"{where}: {problem}")
@@ -340,7 +343,7 @@ def check_format(root: Path, errors: list[str]) -> list[Path]:
                 errors.append(f"{where}: `metadata.version` missing")
         if len(body.splitlines()) > BODY_MAX_LINES:
             errors.append(f"{where}: body over {BODY_MAX_LINES} lines; split into references/")
-        if directory.name == PACK_SKILL and pack_version(skill_md.read_text(encoding="utf-8")) is None:
+        if directory.name == PACK_SKILL and pack_version(text) is None:
             errors.append(f"{where}: needs exactly one `Pack version: X.Y.Z` line (KTD9)")
     return dirs
 
@@ -349,7 +352,7 @@ def check_cross_refs(root: Path, names: set[str], errors: list[str]) -> None:
     for path in scanned_files(root):
         rel = path.relative_to(root)
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            for ref in re.findall(r"`(gameye(?:-[a-z0-9]+)*)`", line):
+            for ref in SKILL_REF_RE.findall(line):
                 if ref not in names and ref not in EXTERNAL_NAMES:
                     errors.append(f"cross-ref: {rel}:{lineno}: references unknown skill `{ref}`")
 
