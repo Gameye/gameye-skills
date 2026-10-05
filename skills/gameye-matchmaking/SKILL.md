@@ -25,10 +25,16 @@ players queue → matchmaker forms group → allocator: POST /session
 
 Design rules that keep this robust:
 
-**Make creation idempotent.** Pass your own session `id` derived from the match
-(`match-<matchId>`). If the allocator retries after a timeout, the duplicate create
-returns `409` — treat that as "already allocated", look the session up, and reuse its
-address. Without this, network blips double-allocate servers and split lobbies.
+**Make creation idempotent.** Pass your own session `id` derived from the match. If
+the allocator retries after a timeout, the duplicate create returns `409` — treat that
+as "already allocated", look the session up, and reuse its address. Without this,
+network blips double-allocate servers and split lobbies.
+
+Session IDs are unique **across all of Gameye**, not just your organization, and stay
+taken after the session ends. Derive them from a globally unique value: a UUID match
+ID, or `<game-slug>-<uuid>`. Never a counter or short match code that another
+customer could also produce. If a `409` is followed by `404` when you describe that
+ID, someone else owns it: retry the create with a fresh ID.
 
 Warm pools break this: a claimed warm container ignores the `id` you send, so there
 is no `409` and the response `id` is the warm container's name. **Always read the
@@ -119,11 +125,14 @@ never in a game client or game server.
 ```typescript
 async function allocate(match: Match): Promise<{ connect: string }> {
   const region = pickRegion(match.playerLatencies);        // p95-minimizing
-  for (const loc of [region, ...fallbacks(region)]) {
+  const locs = [region, ...fallbacks(region)];
+  let sessionId = `my-game-${match.id}`;                   // match.id is a UUID
+  let freshIds = 0;
+  for (let i = 0; i < locs.length; ) {
     try {
       const s = await gameye.startSession({
-        id: `match-${match.id}`, image: IMAGE, version: PINNED_TAG,
-        location: loc,
+        id: sessionId, image: IMAGE, version: PINNED_TAG,
+        location: locs[i],
         env: { MATCH_ID: match.id, JOIN_SECRET: match.joinSecret },
         labels: { "match-id": match.id, mode: match.mode },
         ttl: "90m",
@@ -132,8 +141,14 @@ async function allocate(match: Match): Promise<{ connect: string }> {
     } catch (e) {
       // 409 = already allocated (cold launches only; warm pools ignore `id`,
       // so record match → response id in your backend before retrying)
-      if (e.status === 409) return { connect: await lookup(`match-${match.id}`) };
-      if (e.status === 420) { await backoff(); continue; }   // no compute: next region
+      if (e.status === 409) {
+        const connect = await lookup(sessionId);           // describe; null on 404
+        if (connect) return { connect };
+        if (++freshIds > 1) throw e;
+        sessionId = `my-game-${crypto.randomUUID()}`;     // 404: another org owns it
+        continue;                                          // same region, fresh id
+      }
+      if (e.status === 420) { await backoff(); i++; continue; } // no compute: next region
       throw e;                          // 402/429 quota, real failures: log identifier
     }
   }

@@ -1,6 +1,6 @@
 ---
 name: gameye-unreal-server
-description: Produce an Unreal Engine dedicated server build that runs on Gameye — the Server build target, Linux cross-compilation, packaging, runtime flags, and containerization specifics. Use whenever building or debugging an Unreal dedicated server, adding a Server target to a UE project, packaging a Linux server build, or when the user mentions Unreal server hosting, UE dedicated servers, or running Unreal on Gameye.
+description: Produce an Unreal Engine dedicated server build that runs on Gameye — the Server build target, Linux cross-compilation, packaging, runtime flags, and the Dockerfile variant for Unreal server builds. Use whenever building or debugging an Unreal dedicated server, adding a Server target to a UE project, packaging a Linux server build, or when the user mentions Unreal server hosting, UE dedicated servers, or running Unreal on Gameye.
 metadata:
   version: "1.0.0"
 ---

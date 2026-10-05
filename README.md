@@ -106,11 +106,18 @@ conversation. The skills teach the agent *how to build for* Gameye; the MCP serv
 *operate* Gameye. Both use the same environment variables (`GAMEYE_API_TOKEN`,
 `GAMEYE_ENV`).
 
-The Claude Code plugin above bundles it. For other MCP clients, run it with:
+The Claude Code plugin above bundles it and keeps the token in secure storage; prefer
+it. For other MCP clients, export `GAMEYE_API_TOKEN` from your secret manager or shell
+profile, then run:
 
 ```bash
-GAMEYE_API_TOKEN=<your-token> npx -y gameye-mcp
+npx -y gameye-mcp
+# Claude Code without the plugin:
+claude mcp add gameye -e GAMEYE_API_TOKEN="$GAMEYE_API_TOKEN" -- npx -y gameye-mcp@0
 ```
+
+Avoid putting the token literally on the command line (`GAMEYE_API_TOKEN=<token> ...`):
+it stays in your shell history.
 
 Add `GAMEYE_ENV=production` for an enterprise production token. The
 [gameye-mcp README](https://github.com/gameye/gameye-mcp) has client configuration

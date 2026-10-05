@@ -52,6 +52,12 @@ Eval baseline: pending
   fields, version selection, error codes and the stop grace period.
 - The API token is kept out of game server containers: the skills teach the
   game server → your backend → Gameye pattern.
+- Custom session IDs are unique across all of Gameye, not per organization. The
+  matchmaking and sessions API skills derive IDs from a globally unique value and treat
+  a `409` followed by a describe `404` as "another organization owns this ID; retry with
+  a fresh one".
+- A duplicate token `name` returns `500`, not `409`. The skills say to give every token
+  name a unique suffix and not to retry a token-create `500` with the same name.
 
 ### Removed
 

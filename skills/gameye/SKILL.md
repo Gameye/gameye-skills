@@ -49,6 +49,10 @@ Work through these skills in order; skip what's already done:
 | 6 | `gameye-matchmaking` | A formed match reliably becomes a connected lobby |
 | 7 | `gameye-launch` | The launch checklist is green |
 
+The routing rule in [references/routing.md](references/routing.md) applies from step 4
+on: the local-testing smoke test is the first time you act on Gameye, so read it
+before that step.
+
 For a game engine not listed (Bevy, custom C++, LÖVE, …): `gameye-server-design` and
 `gameye-containerize` are engine-agnostic and cover everything Gameye actually
 requires. The engine skills only add build-pipeline specifics.
@@ -117,11 +121,18 @@ See `gameye-containerize`.
 client API operation as a `gameye_*` tool, so an agent can launch, inspect and stop
 sessions, check tags, and fetch logs and artifacts conversationally.
 
+The Gameye plugin for Claude Code bundles the server and stores the token as a
+sensitive setting; prefer it. Otherwise, with `GAMEYE_API_TOKEN` already exported
+from a secret manager or your shell profile:
+
 ```bash
 npx -y gameye-mcp
-# Claude Code:
-claude mcp add gameye -e GAMEYE_API_TOKEN=<token> -- npx -y gameye-mcp@0
+# Claude Code without the plugin:
+claude mcp add gameye -e GAMEYE_API_TOKEN="$GAMEYE_API_TOKEN" -- npx -y gameye-mcp@0
 ```
+
+Don't type the token literally (`-e GAMEYE_API_TOKEN=<token>`): it stays in your
+shell history.
 
 | Variable | Meaning |
 |---|---|

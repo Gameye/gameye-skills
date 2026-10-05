@@ -31,7 +31,7 @@
     "gameye_env": {
       "type": "string",
       "title": "Gameye environment",
-      "description": "sandbox (self-serve customers; their permanent home, live matches run there) or production (enterprise customers onboarded by Gameye). Tokens from one environment do not work on the other.",
+      "description": "Valid values: sandbox or production; the MCP server refuses to start with anything else. sandbox is for self-serve customers (their permanent home, live matches run there); production is for enterprise customers onboarded by Gameye. Tokens from one environment do not work on the other.",
       "default": "sandbox"
     }
   }

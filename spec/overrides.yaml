@@ -5,8 +5,8 @@
 # not say (or says wrongly), with the server source that proves it. Evidence
 # paths are in the Gameye core repository on its `dev` branch.
 #
-# Read by scripts/generate_reference.py (and, later, the validator and the
-# gameye-mcp parity test). After editing, regenerate the reference:
+# Read by scripts/generate_reference.py, scripts/validate_skills.py and the
+# gameye-mcp parity test. After editing, regenerate the reference:
 #   python3 scripts/generate_reference.py
 #
 # Entry fields:
@@ -319,6 +319,23 @@ overrides:
     evidence:
       - {file: internal/orchestrator/clientapi/run_session.go, function: RunSessionRoute.handleAllocationError}
 
+  - operation: session-run
+    kind: behavior
+    spec_says: "`id` is \"the unique identifier of the session\"; the scope of uniqueness is unstated."
+    fact: >-
+      A custom `id` becomes the container name and must be unique across all of
+      Gameye, not only your organization: the reservation checks every
+      container name, including ended sessions, with no organization filter. A
+      409 on launch followed by a 404 from describe means another organization
+      owns that ID; retry with a fresh one. Derive IDs from a globally unique
+      value (a UUID match ID, or `<game-slug>-<uuid>`).
+    evidence:
+      - {file: db/query.sql, function: ContainerExists}
+      - {file: internal/storage/container.go, function: ContainerDbStore.Reserve}
+      - {file: internal/orchestrator/clientapi/run_session.go, function: RunSessionRoute.createAllocationRequest}
+      - {file: internal/orchestrator/clientapi/run_session.go, function: RunSessionRoute.handleAllocationError}
+      - {file: internal/orchestrator/clientapi/describe_session.go, function: DescribeSessionRoute.ServeHTTP}
+
   # ------------------------------------------------------- tokens
   - operation: create-token
     kind: behavior
@@ -328,6 +345,17 @@ overrides:
       `token:write` caller may delegate without holding it. Omitting
       `expires_after` creates a non-expiring token.
     evidence:
+      - {file: internal/orchestrator/clientapi/create_token.go, function: CreateTokenRoute.ServeHTTP}
+  - operation: create-token
+    kind: response
+    fact: >-
+      Token names are unique per user, but a duplicate `name` returns `500`
+      ("Unable to acquire token."), not 409: the unique-index violation is not
+      mapped to a conflict. Include a unique suffix in every name and do not
+      retry a token-create 500 with the same name.
+    evidence:
+      - {file: db/migrations/20260220161826_api_token_name.sql, function: api_tokens_name_index}
+      - {file: internal/storage/user.go, function: UserDbStore.AddToken}
       - {file: internal/orchestrator/clientapi/create_token.go, function: CreateTokenRoute.ServeHTTP}
 
 # Webhook routes (spec/webhook.yaml), keyed by operationId. The webhook spec

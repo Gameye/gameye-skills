@@ -1,6 +1,6 @@
 ---
 name: gameye-unity-server
-description: Produce a Unity dedicated server build that runs on Gameye — the Dedicated Server build target, netcode choices (Netcode for GameObjects, FishNet, Mirror, Photon Fusion), runtime configuration, shutdown, and containerization specifics. Use whenever building or debugging a Unity multiplayer server, adding dedicated server support to a Unity project, or when the user mentions Unity headless builds, Unity server hosting, Unity Matchmaker, or running Unity on Gameye.
+description: Produce a Unity dedicated server build that runs on Gameye — the Dedicated Server build target, netcode choices (Netcode for GameObjects, FishNet, Mirror, Photon Fusion), runtime configuration, shutdown, and the Dockerfile variant for Unity server builds. Use whenever building or debugging a Unity multiplayer server, adding dedicated server support to a Unity project, or when the user mentions Unity headless builds, Unity server hosting, Unity Matchmaker, or running Unity on Gameye.
 metadata:
   version: "1.0.0"
 ---

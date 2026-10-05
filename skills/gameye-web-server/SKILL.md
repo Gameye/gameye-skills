@@ -1,6 +1,6 @@
 ---
 name: gameye-web-server
-description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and containerization. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
+description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and the Dockerfile variant for Node servers. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
 metadata:
   version: "1.0.0"
 ---
@@ -95,13 +95,23 @@ Every browser game must pick one of:
 
 1. **Per-session DNS + wildcard cert** (the production pattern). Your allocator, on
    session start, creates a DNS A record `s-<sessionId>.play.yourgame.example` →
-   session host IP (any DNS provider with an API; low TTL). The container holds a
-   wildcard certificate for `*.play.yourgame.example` — fetched from your backend at
-   boot (a deliberate, tiny exception to "no downloads at boot"), never passed in
-   session `env`, which any `session:read` token in your organization can read — and the Node server terminates TLS itself (`https.createServer` +
-   `WebSocketServer`). Clients connect
-   `wss://s-<id>.play.yourgame.example:<hostPort>`. Automate cert renewal into image
-   tags or the boot fetch.
+   session host IP (any DNS provider with an API; low TTL). The Node server
+   terminates TLS itself (`https.createServer` + `WebSocketServer`) with a wildcard
+   certificate for `*.play.yourgame.example`, and clients connect
+   `wss://s-<id>.play.yourgame.example:<hostPort>`. Scope the wildcard to a dedicated
+   subdomain used for nothing else, so a leaked key can impersonate game sessions
+   and nothing more.
+
+   The server fetches the key at boot from your backend over an authenticated call
+   (a deliberate, tiny exception to "no downloads at boot"). It presents its
+   short-lived per-match join secret and `MATCH_ID` from env; your backend checks the
+   secret against the one it issued for that match and confirms a live session for it
+   (for example `GET /session?filter[match-id]=<MATCH_ID>`, or the session ID it
+   recorded at allocation) before returning the key. An unauthenticated key endpoint
+   hands every session hostname to anyone who finds it. Never bake the key into the
+   image (registries are not secret stores) and never pass it in session `env`, which
+   any `session:read` token in your organization can read. Renew the certificate on
+   your backend; servers pick up the new key on their next boot.
 2. **Non-browser packaging** — Electron/Tauri/mobile wrappers aren't subject to
    mixed-content rules and may use `ws://ip:port` directly.
 3. **Plain-HTTP page** during development only. Fine on `http://localhost`, not

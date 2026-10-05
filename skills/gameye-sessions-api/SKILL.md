@@ -1,6 +1,6 @@
 ---
 name: gameye-sessions-api
-description: The Gameye REST API for starting, listing, inspecting, and stopping game server sessions, plus player tracking, logs, artifacts, tokens and scopes, applications and tags, regions, and locations. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via the API, minting or scoping Gameye tokens, or when the user mentions starting game servers programmatically, session endpoints, api.sandbox-gameye.gameye.net, api.production-gameye.gameye.net, warm pools, or Gameye error codes. Load it rather than guessing endpoint shapes — several requests and responses differ from what the published schema suggests.
+description: The Gameye REST API for starting, listing, inspecting, and stopping game server sessions, plus player tracking, logs, artifacts, tokens and scopes, applications and tags, regions, and locations. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via the API, minting or scoping Gameye tokens, or when the user mentions starting game servers programmatically, session endpoints, api.sandbox-gameye.gameye.net, api.production-gameye.gameye.net, warm pools, or Gameye error codes. Registry and webhook setup is in gameye-containerize. Load it rather than guessing endpoint shapes — several requests and responses differ from what the published schema suggests.
 metadata:
   version: "1.0.0"
 ---
@@ -42,16 +42,16 @@ POST /session          → 201 Created
 
 ```json
 {
-  "id": "match-m-8842",
+  "id": "my-game-3f2b8c1e-7d4a-4c55-9e0b-2a6f1d9c8e47",
   "location": "eu-central-1",
   "image": "my-game-server",
   "version": "a1b2c3d",
-  "env": { "MAX_PLAYERS": "16", "MATCH_ID": "m-8842" },
+  "env": { "MAX_PLAYERS": "16", "MATCH_ID": "3f2b8c1e-7d4a-4c55-9e0b-2a6f1d9c8e47" },
   "args": ["--tickrate=64"],
-  "labels": { "match-id": "m-8842", "mode": "competitive" },
+  "labels": { "match-id": "3f2b8c1e-7d4a-4c55-9e0b-2a6f1d9c8e47", "mode": "competitive" },
   "restart": false,
   "ttl": "2h",
-  "external_id": "m-8842"
+  "external_id": "3f2b8c1e-7d4a-4c55-9e0b-2a6f1d9c8e47"
 }
 ```
 
@@ -59,7 +59,7 @@ POST /session          → 201 Created
 |---|---|---|
 | `location` | yes | Region name; take it from the available-locations call for this image |
 | `image` | yes | Your application's name, not a registry path |
-| `id` | no | Custom session ID. Omit and Gameye generates a UUID. A retry with the same ID returns `409`, which makes cold launches idempotent — but see warm pools |
+| `id` | no | Custom session ID. Omit and Gameye generates a UUID. IDs are unique **across all of Gameye**, not just your organization, and stay taken after the session ends, so derive them from a globally unique value: a UUID match ID, or `<game-slug>-<uuid>`. A retry with the same ID returns `409`, which makes cold launches idempotent — but see warm pools and the `409` row under Errors |
 | `version` | no | Image tag to run. **Pin it.** Omitted, the server runs the most recently registered tag, so a fresh push silently changes what new matches run. An unavailable tag returns `404` |
 | `env` / `args` | no | Injected into the container — how per-match config reaches the server. Not secret storage (see below) |
 | `labels` | no | Your metadata; matched by `filter[...]` in list calls |
@@ -268,7 +268,13 @@ POST /token          → 201 { "token": "..." }
 - **Omitting `expires_after` creates a token that never expires.** Always set it for
   CI jobs and anything ephemeral (`m`/`h` units, e.g. `"30m"`, `"12h"`).
 - The token appears only in the response. Store it in a secret manager; never log it.
-- A duplicate `name` returns `409`; include a unique suffix.
+- Names are unique per user, but a duplicate `name` currently fails with `500`, not
+  `409`. Always include a unique suffix (build number, timestamp), and do not retry a
+  token-create `500` with the same name.
+- With the `gameye_create_token` tool, the token is written to a file, never returned
+  in chat. Give it a path outside any git working tree (the tool refuses a path inside
+  one), never print or `cat` the file, and tell the user which system should read it
+  (their secret manager, CI secret store, or backend config).
 
 ## Applications and tags
 
@@ -334,11 +340,11 @@ Error bodies:
 | 402 | Trial quota exhausted (session start) | Stop and tell the user; retrying won't help |
 | 403 | Token lacks the scope, or a token request asks for scopes the caller doesn't hold | Use a token with the scope in the reference |
 | 404 | Session, application, image or tag not found, or not yours | For start: check `version` is enabled in that region. For artifacts: session may not be `exited` yet |
-| 409 | Duplicate session ID, session already terminated, or name conflict | Idempotent start: describe the session and continue. Stop: treat as done |
+| 409 | Duplicate session ID (IDs are unique across all of Gameye), or session already terminated | Start: describe that ID. Found → an earlier attempt of yours started it; continue. `404` → another organization owns the ID; retry with a fresh one. Stop: treat as done |
 | 420 | No compute available in the region right now | Back off and retry, or offer the next-best region |
 | 422 | Validation failed | Read `violations` for field-level messages |
 | 429 | Organization quota exceeded (`X-Quota-Type`, `X-Quota-Limit` headers) | Don't hot-retry; stop idle sessions or ask Gameye to raise the quota |
-| 5xx | Gameye-side fault | Retry with backoff; record the `identifier` and include it when contacting support |
+| 5xx | Gameye-side fault | Retry with backoff; record the `identifier` and include it when contacting support. Exception: a `500` from `POST /token` may be a duplicate `name` — retry only with a new name |
 
 Always log the `identifier` from error responses — it's the key support uses to find
 the server-side context.
@@ -350,9 +356,9 @@ const BASE = process.env.GAMEYE_API_URL ?? "https://api.sandbox-gameye.gameye.ne
 const TOKEN = process.env.GAMEYE_API_TOKEN; // backend only; never passed to the server
 const headers = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
 
-async function gameye(path: string, init: RequestInit = {}) {
+async function gameye(path: string, init: RequestInit = {}, allow: number[] = []) {
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
-  if (!res.ok && res.status !== 409) {
+  if (!res.ok && !allow.includes(res.status)) {
     const body = await res.json().catch(() => ({}));
     throw Object.assign(new Error(`gameye ${res.status} ${body.code ?? ""}`),
       { status: res.status, identifier: body.identifier }); // log the identifier
@@ -360,27 +366,36 @@ async function gameye(path: string, init: RequestInit = {}) {
   return res;
 }
 
+// matchId is a UUID your backend generated. Session IDs are unique across all of
+// Gameye, so never use a bare counter or short match code.
 export async function startMatchServer(matchId: string, location: string) {
-  const id = `match-${matchId}`;                    // idempotent on cold launches
-  const res = await gameye("/session", {
-    method: "POST",
-    body: JSON.stringify({
-      id, location, image: "my-game-server",
-      version: process.env.GAME_VERSION,            // pin; omitted = latest registered tag
-      env: { MATCH_ID: matchId },                   // no tokens or long-lived secrets here
-      labels: { "match-id": matchId },
-      external_id: matchId,
-      ttl: "2h",
-    }),
-  });
-  if (res.status === 409) {                         // already started by an earlier attempt
-    const s = await (await gameye(`/session/${id}`)).json();
-    const [hostPort] = Object.values(s.port as Record<string, number>);
-    return { sessionId: s.id, connect: `${s.host}:${hostPort}` };
+  let id = `my-game-${matchId}`;                    // idempotent on cold launches
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await gameye("/session", {
+      method: "POST",
+      body: JSON.stringify({
+        id, location, image: "my-game-server",
+        version: process.env.GAME_VERSION,          // pin; omitted = latest registered tag
+        env: { MATCH_ID: matchId },                 // no tokens or long-lived secrets here
+        labels: { "match-id": matchId },
+        external_id: matchId,
+        ttl: "2h",
+      }),
+    }, [409]);
+    if (res.status !== 409) {
+      const s = await res.json();
+      const game = s.ports.find((p: any) => p.type === "udp") ?? s.ports[0];
+      return { sessionId: s.id, connect: `${s.host}:${game.host}` }; // id from the response
+    }
+    const d = await gameye(`/session/${encodeURIComponent(id)}`, {}, [404]);
+    if (d.ok) {                                     // ours: started by an earlier attempt
+      const s = await d.json();
+      const [hostPort] = Object.values(s.port as Record<string, number>);
+      return { sessionId: s.id, connect: `${s.host}:${hostPort}` };
+    }
+    id = `my-game-${crypto.randomUUID()}`;          // 404: another org owns it; fresh id
   }
-  const s = await res.json();
-  const game = s.ports.find((p: any) => p.type === "udp") ?? s.ports[0];
-  return { sessionId: s.id, connect: `${s.host}:${game.host}` }; // id from the response
+  throw new Error(`no free session id for match ${matchId}`);
 }
 
 export async function reportJoin(sessionId: string, playerIds: string[]) {

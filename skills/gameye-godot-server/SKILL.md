@@ -1,6 +1,6 @@
 ---
 name: gameye-godot-server
-description: Produce a Godot 4 dedicated server build that runs on Gameye — the dedicated_server export feature, headless mode, high-level multiplayer with ENet or WebSocket, runtime configuration, and containerization specifics. Use whenever building or debugging a Godot multiplayer server, exporting a Godot headless Linux build, or when the user mentions Godot dedicated servers, ENetMultiplayerPeer, or hosting a Godot game on Gameye.
+description: Produce a Godot 4 dedicated server build that runs on Gameye — the dedicated_server export feature, headless mode, high-level multiplayer with ENet or WebSocket, runtime configuration, and the Dockerfile variant for Godot server builds. Use whenever building or debugging a Godot multiplayer server, exporting a Godot headless Linux build, or when the user mentions Godot dedicated servers, ENetMultiplayerPeer, or hosting a Godot game on Gameye.
 metadata:
   version: "1.0.0"
 ---
