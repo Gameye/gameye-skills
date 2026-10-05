@@ -1,0 +1,118 @@
+name: scheduled drift check
+
+# Weekly: both public API hosts respond, and the live client spec still matches
+# spec/client.yaml. On any failure, open (or comment on) one tracking issue.
+on:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: scheduled-drift-check
+  cancel-in-progress: false
+
+env:
+  SANDBOX_HOST: https://api.sandbox-gameye.gameye.net
+  PRODUCTION_HOST: https://api.production-gameye.gameye.net
+  ISSUE_TITLE: "Scheduled check failed: API host outage or live spec drift"
+  # Production can lag sandbox between deploys. Set to "false" to report a
+  # production-vs-snapshot difference in the run summary without failing.
+  PRODUCTION_DIFF_FAILS: "true"
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check hosts and spec
+        id: check
+        run: |
+          set +e
+          report=report.md
+          failed=0
+          {
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo "## Host availability (GET /openapi.yaml)"
+            echo
+          } > "$report"
+
+          for host in "$SANDBOX_HOST" "$PRODUCTION_HOST"; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${host}/openapi.yaml")
+            if [ "$code" = "200" ]; then
+              echo "- OK: ${host} returned 200" >> "$report"
+            else
+              echo "- FAIL: ${host} returned ${code:-no response}" >> "$report"
+              failed=1
+            fi
+          done
+
+          echo >> "$report"
+          echo "## Live sandbox spec vs spec/client.yaml" >> "$report"
+          echo >> "$report"
+          out=$(python3 scripts/sync_spec.py --check 2>&1)
+          if [ $? -eq 0 ]; then
+            echo "- OK: $out" >> "$report"
+          else
+            failed=1
+            { echo '```'; echo "$out" | head -c 20000; echo; echo '```'; } >> "$report"
+          fi
+
+          echo >> "$report"
+          echo "## Live production spec vs spec/client.yaml" >> "$report"
+          echo >> "$report"
+          if curl -fsS --max-time 30 -o production.yaml "${PRODUCTION_HOST}/openapi.yaml"; then
+            if diff -q spec/client.yaml production.yaml > /dev/null; then
+              echo "- OK: production /openapi.yaml matches spec/client.yaml" >> "$report"
+            else
+              if [ "$PRODUCTION_DIFF_FAILS" = "true" ]; then failed=1; fi
+              {
+                echo "Production differs from the snapshot (it may lag or lead sandbox):"
+                echo '```diff'
+                diff -u --label "spec/client.yaml (snapshot)" --label "production (live)" \
+                  spec/client.yaml production.yaml | head -c 20000
+                echo
+                echo '```'
+              } >> "$report"
+            fi
+          else
+            failed=1
+            echo "- FAIL: could not fetch ${PRODUCTION_HOST}/openapi.yaml" >> "$report"
+          fi
+
+          {
+            echo
+            echo "To resolve spec drift: run \`python3 scripts/sync_spec.py\`, then"
+            echo "\`python3 scripts/generate_reference.py\`, update spec/overrides.yaml and the"
+            echo "affected skills, and follow the versioning rule in CONTRIBUTING.md."
+          } >> "$report"
+
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the tracking issue
+        if: steps.check.outputs.failed == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"${ISSUE_TITLE}\" in:title" --json number,title \
+            --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file report.md
+            echo "Commented on #$existing"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body-file report.md
+          fi
+
+      - name: Fail the run on drift or outage
+        if: steps.check.outputs.failed == '1'
+        run: exit 1
