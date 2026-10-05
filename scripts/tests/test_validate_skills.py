@@ -281,16 +281,3 @@ def test_cli_base_arg_enables_check(repo: Path) -> None:
 
 
 # ---------------------------------------------------------- characterization
-
-def test_current_repo_skills_fail() -> None:
-    """The unreworked skills must fail: proves the checks bite before U3-U5 fix them."""
-    errors, _, _ = vs.validate(ROOT, env={})
-    if not errors:
-        pytest.skip("skills reworked; characterization no longer applies")
-    kinds = {e.split(":", 1)[0] for e in errors}
-    assert {"format", "banned", "endpoint", "json-body"} <= kinds
-    assert any("api.gameye.io" in e for e in errors)
-    assert any('"player"' in e for e in errors)
-    assert any("/artifacts" in e for e in errors)
-    assert any("filter\\[location\\]" in e for e in errors)
-    assert any("gameye-unity-bootstrap" in e for e in errors)

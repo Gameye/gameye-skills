@@ -1,42 +1,40 @@
 ---
 name: gameye-sessions-api
-description: The complete Gameye REST API reference for starting, listing, inspecting, and stopping game server sessions, plus tokens, locations, tag verification, logs, artifacts, and player tracking. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via API, or when the user mentions starting game servers programmatically, session endpoints, api.gameye.io, or Gameye tokens. Load it rather than guessing endpoint shapes — several responses have non-obvious wire formats.
+description: The Gameye REST API for starting, listing, inspecting, and stopping game server sessions, plus player tracking, logs, artifacts, tokens and scopes, applications and tags, regions, and locations. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via the API, minting or scoping Gameye tokens, or when the user mentions starting game servers programmatically, session endpoints, api.sandbox-gameye.gameye.net, api.production-gameye.gameye.net, warm pools, or Gameye error codes. Load it rather than guessing endpoint shapes — several requests and responses differ from what the published schema suggests.
+metadata:
+  version: "1.0.0"
 ---
 
 # Gameye sessions API
 
-Everything below is HTTPS + JSON against one of two environments:
+Everything below is HTTPS + JSON with `Authorization: Bearer <token>`, against the
+host for the customer's tier:
 
-| Environment | Base URL |
+| Customer | Base URL |
 |---|---|
-| Production | `https://api.gameye.io` |
-| Sandbox | `https://api.sandbox-gameye.gameye.net` |
+| Self-serve | `https://api.sandbox-gameye.gameye.net` |
+| Enterprise | `https://api.production-gameye.gameye.net` |
 
-Build against sandbox first. Keep the base URL configurable — the same code must run
-against both. Full OpenAPI spec and per-endpoint pages: [gameye.com/docs](https://gameye.com/docs/)
-(API V2 section). An MCP server (`gameye-mcp`) wraps this API as agent tools if you
-want conversational session control rather than code.
+Sandbox is the permanent home of self-serve customers and carries their live matches.
+Keep the base URL configurable (`GAMEYE_API_URL`, defaulting to sandbox) so the same
+code runs on either host.
 
-## Authentication and tokens
+Where to find what:
 
-Every request carries:
+- **This file**: procedure and pitfalls per domain.
+- **[references/api-reference.md](references/api-reference.md)**: every operation with
+  method, path, server-checked scope, MCP tool and corrected notes. Generated; trust its
+  Notes column over the published schema.
+- **`<host>/openapi.yaml`**: the live schema each host serves, for exact field types.
+  Where it disagrees with the reference's Notes, the Notes describe what the server
+  actually does.
+- **Tools or HTTP?** Follow the routing rule in the `gameye` skill's
+  [references/routing.md](../gameye/references/routing.md): act through `gameye_*`
+  tools when you have them; code for the user's backend always uses HTTP.
 
-```
-Authorization: Bearer YOUR_TOKEN
-```
+## Sessions
 
-Tokens are created in the Admin Panel (**Users → edit account → API Tokens → + Add
-Token**) and are shown **once**, at creation. Tokens carry **scopes** (for example
-`session:start`, `session:read`) — give each integration only what it uses: a
-matchmaker needs `session:start` + `session:read`; a dashboard needs `session:read`
-alone.
-
-Short-lived tokens can be minted programmatically with `POST /token` using an
-existing token: pass `expires_after` (e.g. `"30m"`, `"12h"`) and the scopes to
-delegate. A token can only delegate scopes it already holds. Use this for CI jobs and
-anything ephemeral; rotate long-lived tokens periodically.
-
-## Start a session
+### Start a session
 
 ```
 POST /session          → 201 Created
@@ -44,6 +42,7 @@ POST /session          → 201 Created
 
 ```json
 {
+  "id": "match-m-8842",
   "location": "eu-central-1",
   "image": "my-game-server",
   "version": "a1b2c3d",
@@ -51,20 +50,22 @@ POST /session          → 201 Created
   "args": ["--tickrate=64"],
   "labels": { "match-id": "m-8842", "mode": "competitive" },
   "restart": false,
-  "ttl": "2h"
+  "ttl": "2h",
+  "external_id": "m-8842"
 }
 ```
 
 | Field | Required | Notes |
 |---|---|---|
-| `location` | yes | Region name; must come from the available-locations call for this image |
-| `image` | yes | Your application's image alias, not a registry path |
-| `id` | no | Custom session ID. Omit and Gameye generates an RFC4122 UUID. Supplying your own makes creation **idempotent**: a retry of the same ID returns `409`, which your matchmaker can treat as "already started" instead of double-allocating |
-| `version` | no | Image tag to run. Pin explicitly in production; verify first with the tag endpoint |
-| `env` / `args` | no | Injected into the container verbatim — this is how match config reaches the server |
-| `labels` | no | Your metadata; filterable in list calls |
+| `location` | yes | Region name; take it from the available-locations call for this image |
+| `image` | yes | Your application's name, not a registry path |
+| `id` | no | Custom session ID. Omit and Gameye generates a UUID. A retry with the same ID returns `409`, which makes cold launches idempotent — but see warm pools |
+| `version` | no | Image tag to run. **Pin it.** Omitted, the server runs the most recently registered tag, so a fresh push silently changes what new matches run. An unavailable tag returns `404` |
+| `env` / `args` | no | Injected into the container — how per-match config reaches the server. Not secret storage (see below) |
+| `labels` | no | Your metadata; matched by `filter[...]` in list calls |
 | `restart` | no | Auto-restart on failure. Leave `false` for match servers that exit when done |
-| `ttl` | no | Hard lifetime cap (`"90m"`, `"2h"`). Set it on virtually every session — it is the leak-proof cost control |
+| `ttl` | no | Hard lifetime cap in `m`/`h` units (`"90m"`, `"2h30m"`). Set it on virtually every session |
+| `external_id` | no | Your own identifier for the session (match ID, ticket ID) |
 
 Response:
 
@@ -78,158 +79,322 @@ Response:
 }
 ```
 
-Read the port mapping carefully: the server bound `container` (7777) inside the
-container; players connect to `host:host-port` (`203.0.113.42:25159`). Host ports are
-allocated in the 20000–30000 range. Never hand players the container port. When
-several ports are bound, pick the game-traffic one by its `container`/`type` values —
-your application's port bindings (Admin Panel) define which is which.
+Players connect to `host:<ports[].host>` (`203.0.113.42:25159`), never to the
+container port. Host ports are allocated in the 20000–30000 range. When several ports
+are bound, pick the game-traffic one by its `container`/`type` values — the
+application's port bindings define which is which.
 
-The call is synchronous — when it returns, the container is being started and the
-address is final. Poll describe (below) for `running` if you want confirmed readiness
-before sending players, or just let clients retry connection for a few seconds.
+The call is synchronous: when it returns, the address is final and the container is
+starting. Poll describe for `running` if you want confirmed readiness, or let clients
+retry the connection for a few seconds.
 
-## List sessions
+### Warm pools
+
+If a warm pool is enabled for the image and region, the request is served from the
+pool, and:
+
+- `env`, `args` and `labels` from the request are **ignored, even when the pool is
+  exhausted** — the cold fallback uses the pool's configured values. Per-match config
+  must reach the server another way (for example the server fetches it from your
+  backend on start, keyed by its session ID).
+- A claimed warm container also ignores `version`, `restart` and `id`. The response
+  `id` is the warm container's name. **Always read the session ID from the response**,
+  never assume it equals the `id` you sent.
+- Because `id` is ignored, a duplicate `id` does not produce `409`; deduplicate retries
+  in your own backend (record the match → session mapping before retrying).
+- `ttl` and `external_id` are honored.
+
+### Session env is not secret
+
+List and describe return `labels`, which hold the raw container labels: `tags` (your
+launch labels, as a JSON string), `env` (the full launch environment, as a JSON
+string) and `gameye` (system labels). Any token in your organization with
+`session:read` can read every launch env value. Never put a Gameye API token or other
+long-lived credential in `env` or `args`. Short-lived per-match values, such as a join
+secret, are acceptable. If a game server needs something from Gameye, it asks your
+backend, and your backend calls Gameye.
+
+### List sessions
 
 ```
-GET /session?filter[location]=eu-central-1&filterNot[status]=exited
+GET /session?location=eu-central-1&image=my-game-server&playerCount[lt]=16&filter[mode]=competitive
 ```
 
-Query parameters: `all` (include non-running), `filter[<field>]` and
-`filterNot[<field>]` to match or exclude on session fields and labels. Response is
-`{ "sessions": [ ... ] }`, each entry carrying `id`, `image`, `tag`, `location`,
-`status`, `playerCount`, `labels`, and `created` (Unix **milliseconds**).
+| Parameter | Behavior |
+|---|---|
+| `all=true` | Include non-running sessions. **Without it, only running sessions are returned.** |
+| `location`, `image`, `tag`, `host` | Plain exact-match parameters on the session's fields |
+| `playerCount[lt]=N`, `playerCount[gt]=N` | Strict less-than / greater-than |
+| `filter[key]=value` | Matches **only launch labels** (never env, status or other fields) |
+| `filterNot[key]=value` | Excludes by launch label; a session without the key fails both `filter` and `filterNot`, so unlabeled sessions are not returned |
 
-This powers backfill queries ("competitive sessions in EU that aren't full") and
-ops dashboards. Filter server-side rather than fetching everything.
+Response is `{ "sessions": [ ... ] }`; each entry has `id`, `image`, `tag`,
+`location`, `host`, `status`, `playerCount`, `labels`, `port` (map format, see
+describe) and `created` (Unix **milliseconds**). To read your own labels from an
+entry, JSON-parse `labels.tags`.
 
-## Describe a session
+Pitfalls: a `filter[...]` keyed on a session field name (location, status, image)
+matches a launch label of that name, not the session field, and silently returns
+nothing. Use the plain parameters for session fields. Filter server-side
+rather than fetching everything. Under warm pools, request labels are dropped, so
+label filters only see the pool's labels.
+
+### Describe a session
 
 ```
 GET /session/{id}
 ```
 
-Returns full detail: `status`, `host`, `labels`, `args`, `restart`, `ttl`,
-`players: { "joined": ["p1", "p2"], "joinedCount": 2 }`, `created` (Unix ms) — and
-ports in a **different wire format** than session start:
+Returns `status`, `host`, `image`, `tag`, `location`, `labels`, `created` (Unix ms),
+`players: { "joined": ["p1", "p2"], "joinedCount": 2 }` — and ports in a **different
+wire format** than session start, under the singular key `port`:
 
-```json
+```
 "port": { "7777/udp": 25159 }
 ```
 
-A map of `"<container-port>/<protocol>"` → host port, under the singular key `port`.
-Parse accordingly; do not reuse the start-response parser here.
+A map of `"<container-port>/<protocol>"` → host port. Do not reuse the start-response
+parser here.
 
-## Stop a session
+### Stop a session
 
 ```
 DELETE /session/{id}   → 204 No Content
 ```
 
-Sends SIGTERM; the session moves through `draining → shuttingdown → exited`, giving
-the server its grace window to flush results and artifacts. Stopping an
-already-terminated session returns `409`.
+Sends SIGTERM; the session moves through `draining → shuttingdown → exited`. The
+server gets a grace period (by default about 50 seconds) to flush results and
+artifacts before the container is killed; keep shutdown well inside it. Stopping an
+already-terminated session returns `409` — treat it as success in cleanup paths.
 
-## Session status values
+### Session status values
 
-`created` (initializing, not yet accepting connections) → `running` → on stop/TTL:
-`draining` → `shuttingdown` → `exited` (final; artifacts now retrievable). Exceptional
-states: `restarting` (crashed, `restart: true`), `dead` (unrecoverable),
-`server_unreachable` (host lost contact; may recover — don't insta-kill on first
-sight of it).
+`created` (initializing) → `running` → on stop/TTL: `draining` → `shuttingdown` →
+`exited` (final). Exceptional states: `restarting` (crashed, `restart: true`), `dead`
+(unrecoverable), `server_unreachable` (host lost contact; may recover — don't stop it
+on first sight).
 
-## Player tracking
-
-```
-PUT    /session/player/join    { "session": "<id>", "player": "<player-id>" }
-DELETE /session/player/leave   { "session": "<id>", "player": "<player-id>" }
-```
-
-Report joins and leaves from your backend as players connect and drop. This is what
-makes `playerCount` real, which in turn makes backfill filtering and "is this session
-empty and stoppable?" decisions possible. Use opaque player IDs, not PII.
-
-## Locations
+## Players
 
 ```
-GET /available-location/{image}
+PUT /session/player/join
 ```
 
-Returns `{ "locations": [ { "id": "eu-central-1", "ips": ["..."] } ] }` — the regions
-where your image can run right now, each with **ping IPs**. Have game clients ping
-those IPs and report latencies to your matchmaker; pick the region with the best
-aggregate for the match group. Region availability can change; fetch rather than
-hardcode.
-
-## Tag verification
-
-```
-GET /tag/{region}/{image}/{version}   → { "exists": true }
+```json
+{ "session": "c5c7c507-f5de-443e-b772-af4b444cfc21", "players": ["p-1001", "p-1002"] }
 ```
 
-Confirms a tag is actually available in a region before you start sessions on it.
-Call it in CI after pushing a new tag (Gameye preloads tags from your registry;
-preload is fast but not instantaneous) and as a pre-flight before rolling a new
-version. Your application keeps a limited number of tags warm ("Tags to keep",
-typically 2) — old tags rotate out, so don't expect ancient versions to still exist.
+```
+DELETE /session/player/leave
+```
+
+```json
+{ "session": "c5c7c507-f5de-443e-b772-af4b444cfc21", "players": ["p-1001"] }
+```
+
+Procedure: your **backend** reports joins and leaves as players connect and drop
+(the game server tells your backend; your backend calls Gameye with a `session:write`
+token). This is what makes `playerCount` real, which powers backfill queries and
+"is this session empty and stoppable?" decisions.
+
+Pitfalls:
+
+- Both bodies take `session` plus a **plural** `players` array. A singular `player`
+  field registers nothing. The leave body needs `session` even though the published
+  schema omits it; without it the server returns `404`.
+- Join responds with **every** player now in the session (`players`, `count`), not only
+  the ones just added. Leave responds with the players remaining; `players` is `null`
+  (not `[]`) when the session is empty, so guard before iterating.
+- Use the session ID from the start response. An unknown or foreign session is `404`.
+- Use opaque player IDs, not emails or other PII.
 
 ## Logs and artifacts
 
 ```
-GET /logs?id=<session-id>            → text/plain (add follow=true to stream)
-GET /artifacts?id=<session-id>       → tar archive of the container's artifact files
+GET /logs?id=<session-id>&follow=false              → text/plain
+GET /artifacts?session=<session-id>&path=/app/out   → tar stream
 ```
 
-Logs are the container's stdout/stderr. Artifacts are only available once the session
-reaches `exited` — a 404 right after stopping usually means it's still shutting down;
-poll describe until `exited`, then fetch. Game servers log a lot; prefer streaming and
-narrow time windows over repeated full dumps.
+**Logs** are the container's stdout/stderr. `follow` **defaults to `true`**: without
+`follow=false` the server keeps the stream open until you disconnect or the request
+times out. Use `follow=false` for a snapshot (debugging, CI, an agent reading logs);
+use the default only when you deliberately tail with a streaming reader.
+
+**Artifacts** download a file or folder from the container. Both query parameters are
+required: `session` (the session ID — not `id`) and `path` (an absolute path inside
+the container). The response is an **uncompressed tar** (`application/octet-stream`,
+filename `<session>.tar`); do not gunzip it. Artifacts become available once the
+session has terminated and remain only until the container is removed from its host,
+so fetch promptly after `exited`. A `404` right after stopping usually means it's still
+shutting down; poll describe until `exited`, then fetch. Keep downloads under 100 MB.
+
+## Tokens and scopes
+
+Tokens are created in the Admin Panel (**Users → edit account → API Tokens → + Add
+Token**) and shown **once**. Each token carries scopes; the server checks one scope
+per operation (listed in the reference). Legacy unscoped tokens skip the check, so
+moving to scoped tokens can surface `403`s that were hidden before.
+
+### Least-privilege recipes
+
+| Integration | Scopes |
+|---|---|
+| Allocator / matchmaker backend | `session:start` `session:read` (add `session:stop` if it ends matches, `regions:read` for available locations) |
+| Player relay (reports joins/leaves) | `session:write` |
+| Observer / dashboard / agent debugging | `session:read` `logs:read` `artifact:read` `regions:read` (add `region:read` to list all regions) |
+| CI: verify and enable tags | `regions:read` (tag check and enable-tag), plus `application:read` to list upstream registry tags |
+| Registry webhook | `webhook:dockerhub` or `webhook:github` only — set up in `gameye-containerize` |
+| Token minting service | `token:write` plus every scope it hands out |
+
+Note the two region scopes: `GET /region` checks `region:read` (singular), while
+available locations, tag checks and enable-tag check `regions:read`. Enable-tag is
+checked as `regions:read` today although the published schema declares
+`application:write`; this may be corrected, so a CI token that should survive the
+change can also hold `application:write`.
+
+### Mint short-lived tokens
+
+```
+POST /token          → 201 { "token": "..." }
+```
+
+```json
+{ "name": "ci-build-1234", "scopes": ["regions:read"], "expires_after": "1h" }
+```
+
+- The caller needs `token:write`, and the requested `scopes` must be a subset of the
+  caller's own scopes (`403` otherwise). The one exception: `webhook:github` can be
+  delegated by any `token:write` caller.
+- **Omitting `expires_after` creates a token that never expires.** Always set it for
+  CI jobs and anything ephemeral (`m`/`h` units, e.g. `"30m"`, `"12h"`).
+- The token appears only in the response. Store it in a secret manager; never log it.
+- A duplicate `name` returns `409`; include a unique suffix.
+
+## Applications and tags
+
+An application is usually created and edited in the Admin Panel. The API equivalents
+(`POST /application`, `PUT /application/{name}`) need `application:write`; treat them
+as admin actions and confirm with the user before calling them. `GET /application`
+lists applications with their registry, repository, `tagKeep`, resources, regions and
+port bindings.
+
+Tag procedure (registry and webhook setup itself is in `gameye-containerize`):
+
+1. **See what the registry has:** `GET /application/{name}/tags/available` lists tags
+   in the upstream registry (`page`, `pageSize` up to 1000) as `{ "tags": [ { "version":
+   "..." } ] }`. Being in the registry does not mean Gameye has it.
+2. **Enable a tag** when the webhook did not register it (or to pull its preload
+   forward):
+
+   ```
+   POST /application/{name}/tags     → 204
+   ```
+
+   ```json
+   { "tag": "a1b2c3d" }
+   ```
+
+3. **Verify before use:** `GET /tag/{region}/{image}/{version}` → `{ "exists": true }`
+   once the tag is preloaded in that region. Call it in CI after a push and as a
+   pre-flight before rolling a version.
+4. **Launch with `version` pinned** to that tag.
+
+Pitfalls: preload is fast but not instantaneous; the application keeps only its
+`tagKeep` most recent tags ("Tags to keep"), so old versions rotate out; and launches
+without `version` follow whichever tag was registered last.
+
+## Regions and locations
+
+```
+GET /available-location/{image}   → { "locations": [ { "id": "eu-central-1", "ips": ["..."] } ] }
+GET /region                        → { "regions": ["..."] }
+```
+
+Use **available locations** for placement: they are the regions that can host this
+image right now, each with ping IPs. Have clients ping those IPs and report latency to
+your matchmaker; pick the region with the best aggregate for the match group. Don't
+cache the list — availability changes. `GET /region` lists your organization's regions
+in general and does not say whether your image can run there; use it for dashboards
+and configuration, not session placement.
 
 ## Errors
 
-Error bodies look like:
+Error bodies:
 
-```json
-{ "statusCode": 422, "code": "INVALID_INPUT", "message": "...", "details": [...],
-  "identifier": "…", "path": "/session", "timestamp": "…" }
+```
+{ "statusCode": 422, "code": "...", "message": "...", "details": "...",
+  "violations": [ { "field": "...", "description": "..." } ],
+  "identifier": "...", "path": "/session", "timestamp": "..." }
 ```
 
 | HTTP | Meaning | Handle it by |
 |---|---|---|
-| 401 | Bad/missing token | Fix credentials; check environment (sandbox token on production URL is a classic) |
-| 404 | Session/tag not found | For artifacts: session may not be `exited` yet |
-| 409 | Duplicate session ID, or session already terminated | For idempotent creates: treat as success and look the session up |
-| 420 | No capacity in region, or rate limited | Back off and retry; offer an alternate region |
-| 422 | Validation failed | Read `details`/violations — field-level messages |
-| 5xx | Gameye-side fault | Record the `identifier` (trace ID) and include it when contacting Gameye support |
+| 400 | Malformed request (bad duration or scope on `/token`, missing artifacts params) | Fix the request |
+| 401 | Bad or missing token | Fix credentials; check the host (a token for one host fails on the other) |
+| 402 | Trial quota exhausted (session start) | Stop and tell the user; retrying won't help |
+| 403 | Token lacks the scope, or a token request asks for scopes the caller doesn't hold | Use a token with the scope in the reference |
+| 404 | Session, application, image or tag not found, or not yours | For start: check `version` is enabled in that region. For artifacts: session may not be `exited` yet |
+| 409 | Duplicate session ID, session already terminated, or name conflict | Idempotent start: describe the session and continue. Stop: treat as done |
+| 420 | No compute available in the region right now | Back off and retry, or offer the next-best region |
+| 422 | Validation failed | Read `violations` for field-level messages |
+| 429 | Organization quota exceeded (`X-Quota-Type`, `X-Quota-Limit` headers) | Don't hot-retry; stop idle sessions or ask Gameye to raise the quota |
+| 5xx | Gameye-side fault | Retry with backoff; record the `identifier` and include it when contacting support |
 
 Always log the `identifier` from error responses — it's the key support uses to find
-the full server-side context.
+the server-side context.
 
 ## Minimal client sketch
 
 ```typescript
 const BASE = process.env.GAMEYE_API_URL ?? "https://api.sandbox-gameye.gameye.net";
-const auth = { Authorization: `Bearer ${process.env.GAMEYE_API_TOKEN}`,
-               "Content-Type": "application/json" };
+const TOKEN = process.env.GAMEYE_API_TOKEN; // backend only; never passed to the server
+const headers = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+
+async function gameye(path: string, init: RequestInit = {}) {
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  if (!res.ok && res.status !== 409) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(`gameye ${res.status} ${body.code ?? ""}`),
+      { status: res.status, identifier: body.identifier }); // log the identifier
+  }
+  return res;
+}
 
 export async function startMatchServer(matchId: string, location: string) {
-  const res = await fetch(`${BASE}/session`, {
-    method: "POST", headers: auth,
+  const id = `match-${matchId}`;                    // idempotent on cold launches
+  const res = await gameye("/session", {
+    method: "POST",
     body: JSON.stringify({
-      location, image: "my-game-server", version: process.env.GAME_VERSION,
-      id: `match-${matchId}`,                       // idempotent under retry
-      env: { MATCH_ID: matchId },
+      id, location, image: "my-game-server",
+      version: process.env.GAME_VERSION,            // pin; omitted = latest registered tag
+      env: { MATCH_ID: matchId },                   // no tokens or long-lived secrets here
       labels: { "match-id": matchId },
+      external_id: matchId,
       ttl: "2h",
     }),
   });
-  if (res.status === 409) return lookupSession(`match-${matchId}`); // already started
-  if (!res.ok) throw new Error(`gameye ${res.status}: ${await res.text()}`);
+  if (res.status === 409) {                         // already started by an earlier attempt
+    const s = await (await gameye(`/session/${id}`)).json();
+    const [hostPort] = Object.values(s.port as Record<string, number>);
+    return { sessionId: s.id, connect: `${s.host}:${hostPort}` };
+  }
   const s = await res.json();
   const game = s.ports.find((p: any) => p.type === "udp") ?? s.ports[0];
-  return { sessionId: s.id, connect: `${s.host}:${game.host}` };
+  return { sessionId: s.id, connect: `${s.host}:${game.host}` }; // id from the response
+}
+
+export async function reportJoin(sessionId: string, playerIds: string[]) {
+  await gameye("/session/player/join", {
+    method: "PUT", body: JSON.stringify({ session: sessionId, players: playerIds }),
+  });
+}
+
+export async function logSnapshot(sessionId: string) {
+  return (await gameye(`/logs?id=${encodeURIComponent(sessionId)}&follow=false`)).text();
 }
 ```
 
-For allocator patterns, backfill, and region selection strategy built on these calls,
-load `gameye-matchmaking`.
+Handle 420 and 5xx with bounded retries (same `id`), 402 and 429 by surfacing the
+problem instead of retrying, and stop sessions you no longer need. For allocator
+patterns, backfill, and region selection built on these calls, load
+`gameye-matchmaking`.
