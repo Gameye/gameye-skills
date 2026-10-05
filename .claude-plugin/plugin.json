@@ -1,0 +1,38 @@
+{
+  "name": "gameye",
+  "displayName": "Gameye",
+  "description": "Teach your coding agent to ship multiplayer: skills for authoritative server design, engine server builds, containerization, the Gameye sessions API, matchmaking and launch, plus the bundled Gameye MCP server.",
+  "author": {
+    "name": "Gameye B.V.",
+    "url": "https://gameye.com"
+  },
+  "homepage": "https://github.com/gameye/gameye-skills",
+  "repository": "https://github.com/gameye/gameye-skills",
+  "license": "MIT",
+  "keywords": ["gameye", "gamedev", "multiplayer", "dedicated-servers", "game-server-hosting", "mcp"],
+  "mcpServers": {
+    "gameye": {
+      "command": "npx",
+      "args": ["-y", "gameye-mcp@0"],
+      "env": {
+        "GAMEYE_API_TOKEN": "${user_config.gameye_api_token}",
+        "GAMEYE_ENV": "${user_config.gameye_env}"
+      }
+    }
+  },
+  "userConfig": {
+    "gameye_api_token": {
+      "type": "string",
+      "title": "Gameye API token",
+      "description": "API token from the Gameye Admin Panel (Users > API Tokens) for the environment below. Use the narrowest scopes you need. Stored in secure storage, never in settings.json.",
+      "required": true,
+      "sensitive": true
+    },
+    "gameye_env": {
+      "type": "string",
+      "title": "Gameye environment",
+      "description": "sandbox (self-serve customers; their permanent home, live matches run there) or production (enterprise customers onboarded by Gameye). Tokens from one environment do not work on the other.",
+      "default": "sandbox"
+    }
+  }
+}

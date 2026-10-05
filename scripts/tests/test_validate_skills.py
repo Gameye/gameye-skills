@@ -50,6 +50,7 @@ def tree(tmp_path: Path) -> Path:
           gen.generate(tmp_path / "spec/client.yaml", tmp_path / "spec/webhook.yaml",
                        tmp_path / "spec/overrides.yaml"))
     write(tmp_path, "CHANGELOG.md", "# Changelog\n")
+    shutil.copytree(ROOT / ".claude-plugin", tmp_path / ".claude-plugin")
     return tmp_path
 
 
@@ -281,3 +282,101 @@ def test_cli_base_arg_enables_check(repo: Path) -> None:
 
 
 # ---------------------------------------------------------- characterization
+
+
+# ---------------------------------------------------------- manifests
+
+import json  # noqa: E402
+
+MARKET = ".claude-plugin/marketplace.json"
+PLUGIN = ".claude-plugin/plugin.json"
+
+
+def edit_json(root: Path, rel: str, change) -> None:
+    path = root / rel
+    data = json.loads(path.read_text())
+    change(data)
+    path.write_text(json.dumps(data))
+
+
+def manifest_errors(root: Path) -> list[str]:
+    return [e for e in run(root) if e.startswith("manifest:")]
+
+
+def test_real_manifests_pass() -> None:
+    errors: list[str] = []
+    vs.check_manifests(ROOT, errors)
+    assert errors == []
+
+
+def test_missing_manifest_fails(tree: Path) -> None:
+    (tree / PLUGIN).unlink()
+    assert any("plugin.json is missing" in e for e in manifest_errors(tree))
+
+
+def test_invalid_json_fails(tree: Path) -> None:
+    (tree / MARKET).write_text("{ not json")
+    assert any("marketplace.json is not valid JSON" in e for e in manifest_errors(tree))
+
+
+def test_plugin_version_fails(tree: Path) -> None:
+    edit_json(tree, PLUGIN, lambda d: d.update(version="1.0.0"))
+    assert any("remove `version`" in e for e in manifest_errors(tree))
+
+
+def test_marketplace_entry_version_fails(tree: Path) -> None:
+    edit_json(tree, MARKET, lambda d: d["plugins"][0].update(version="1.0.0"))
+    assert any("sets `version`" in e for e in manifest_errors(tree))
+
+
+@pytest.mark.parametrize("source", [".", "./"])
+def test_root_source_forms_pass(tree: Path, source: str) -> None:
+    edit_json(tree, MARKET, lambda d: d["plugins"][0].update(source=source))
+    assert manifest_errors(tree) == []
+
+
+@pytest.mark.parametrize("source", ["./skills", "plugins/gameye", {"source": "github", "repo": "x/y"}])
+def test_non_root_source_fails(tree: Path, source) -> None:
+    edit_json(tree, MARKET, lambda d: d["plugins"][0].update(source=source))
+    assert any("source" in e for e in manifest_errors(tree))
+
+
+def test_entry_skills_list_fails(tree: Path) -> None:
+    edit_json(tree, MARKET, lambda d: d["plugins"][0].update(skills=["./skills/gameye"]))
+    assert any("disables the default skills/ scan" in e for e in manifest_errors(tree))
+
+
+def test_entry_name_must_match_plugin(tree: Path) -> None:
+    edit_json(tree, MARKET, lambda d: d["plugins"][0].update(name="other"))
+    assert any("no plugin entry named 'gameye'" in e for e in manifest_errors(tree))
+
+
+def test_root_without_skills_fails(tree: Path) -> None:
+    shutil.rmtree(tree / "skills")
+    assert any("has no skills/" in e for e in manifest_errors(tree))
+
+
+@pytest.mark.parametrize("package", ["gameye-mcp", "gameye-mcp@latest", "gameye-mcp@0.1.0"])
+def test_unpinned_mcp_fails(tree: Path, package: str) -> None:
+    edit_json(tree, PLUGIN, lambda d: d["mcpServers"]["gameye"].update(args=["-y", package]))
+    assert any("pin a major version" in e for e in manifest_errors(tree))
+
+
+def test_missing_mcp_server_fails(tree: Path) -> None:
+    edit_json(tree, PLUGIN, lambda d: d.pop("mcpServers"))
+    assert any("mcpServers" in e for e in manifest_errors(tree))
+
+
+def test_token_option_must_be_sensitive(tree: Path) -> None:
+    edit_json(tree, PLUGIN, lambda d: d["userConfig"]["gameye_api_token"].pop("sensitive"))
+    assert any("must set `\"sensitive\": true`" in e for e in manifest_errors(tree))
+
+
+def test_literal_token_fails(tree: Path) -> None:
+    edit_json(tree, PLUGIN, lambda d: d["mcpServers"]["gameye"]["env"].update(GAMEYE_API_TOKEN="abc"))
+    assert any("never a literal" in e for e in manifest_errors(tree))
+
+
+def test_undeclared_user_config_fails(tree: Path) -> None:
+    edit_json(tree, PLUGIN, lambda d: d["userConfig"].pop("gameye_env"))
+    assert any("undeclared `userConfig.gameye_env`" in e for e in manifest_errors(tree))

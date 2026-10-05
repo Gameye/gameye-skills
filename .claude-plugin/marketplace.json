@@ -1,0 +1,17 @@
+{
+  "name": "gameye",
+  "description": "Gameye agent skills and the Gameye MCP server for shipping multiplayer games on Gameye managed game server hosting.",
+  "owner": {
+    "name": "Gameye",
+    "url": "https://gameye.com"
+  },
+  "plugins": [
+    {
+      "name": "gameye",
+      "source": ".",
+      "description": "Agent skills for building, containerizing and hosting dedicated game servers on Gameye, plus the bundled gameye-mcp server for operating sessions.",
+      "category": "development",
+      "tags": ["gamedev", "multiplayer", "game-servers", "hosting", "docker"]
+    }
+  ]
+}

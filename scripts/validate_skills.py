@@ -16,6 +16,13 @@ Checks (each failure is collected; exit code 1 if any):
                `METHOD /path` mention exist in that operation's request body
                (spec/overrides.yaml request-body overrides win).
   reference    the generated api-reference.md is current.
+  manifests    .claude-plugin/marketplace.json and plugin.json parse; plugin.json
+               has no `version` (KTD7: updates track the commit SHA); the
+               marketplace entry's source resolves to the repo root, which holds
+               skills/, and lists no `skills` (that would disable default
+               scanning); the bundled MCP server pins `gameye-mcp@<major>` and
+               every `${user_config.KEY}` it uses is declared, with the token
+               option marked sensitive.
   versioning   (PR mode) a changed SKILL.md body needs a CHANGELOG.md change,
                a bump of that skill's `metadata.version`, and a bump of the
                pack version in the `gameye` skill.
@@ -100,6 +107,13 @@ ENDPOINT_RE = re.compile(
 JSON_FENCE_RE = re.compile(r"^\s*```json\s*$", re.IGNORECASE)
 FENCE_RE = re.compile(r"^\s*```")
 JSON_LOOKBACK_LINES = 6
+
+MARKETPLACE_MANIFEST = Path(".claude-plugin/marketplace.json")
+PLUGIN_MANIFEST = Path(".claude-plugin/plugin.json")
+MCP_PACKAGE = "gameye-mcp"
+MCP_PIN_RE = re.compile(rf"^{re.escape(MCP_PACKAGE)}@(\d+)$")
+USER_CONFIG_REF_RE = re.compile(r"\$\{user_config\.([A-Za-z_][A-Za-z0-9_]*)\}")
+TOKEN_ENV = "GAMEYE_API_TOKEN"
 
 
 # ------------------------------------------------------------------ helpers
@@ -416,6 +430,114 @@ def check_reference(root: Path, errors: list[str]) -> None:
         errors.append(f"reference: {GENERATED_REFERENCE} is stale; run `{REGENERATE_COMMAND}`")
 
 
+# ------------------------------------------------------------------ manifests
+
+def load_manifest(root: Path, rel: Path, errors: list[str]) -> dict | None:
+    path = root / rel
+    if not path.is_file():
+        errors.append(f"manifest: {rel} is missing")
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        errors.append(f"manifest: {rel} is not valid JSON: {error}")
+        return None
+    if not isinstance(data, dict):
+        errors.append(f"manifest: {rel} must be a JSON object")
+        return None
+    return data
+
+
+def check_manifests(root: Path, errors: list[str]) -> None:
+    market = load_manifest(root, MARKETPLACE_MANIFEST, errors)
+    plugin = load_manifest(root, PLUGIN_MANIFEST, errors)
+    m, p = f"manifest: {MARKETPLACE_MANIFEST}", f"manifest: {PLUGIN_MANIFEST}"
+    plugin_name = plugin.get("name") if plugin else None
+
+    if plugin is not None:
+        if not isinstance(plugin_name, str) or not NAME_RE.match(plugin_name):
+            errors.append(f"{p}: `name` missing or not kebab-case")
+        if "version" in plugin:
+            errors.append(f"{p}: remove `version`; without it Claude Code updates track the "
+                          "commit SHA, and a forgotten bump can't block updates (KTD7)")
+        check_mcp_servers(plugin, p, errors)
+
+    if market is not None:
+        if not isinstance(market.get("name"), str) or not market["name"]:
+            errors.append(f"{m}: `name` missing")
+        owner = market.get("owner")
+        if not isinstance(owner, dict) or not owner.get("name"):
+            errors.append(f"{m}: `owner.name` missing")
+        entries = market.get("plugins")
+        if not isinstance(entries, list) or not entries:
+            errors.append(f"{m}: `plugins` must be a non-empty array")
+            return
+        entry = next((e for e in entries if isinstance(e, dict) and e.get("name") == plugin_name), None)
+        if entry is None:
+            errors.append(f"{m}: no plugin entry named {plugin_name!r} (must match plugin.json `name`)")
+            return
+        if "version" in entry:
+            errors.append(f"{m}: plugin entry {plugin_name!r} sets `version`; omit it (KTD7)")
+        if "skills" in entry:
+            errors.append(f"{m}: plugin entry {plugin_name!r} lists `skills`, which disables the "
+                          "default skills/ scan; rely on skills/ instead")
+        source = entry.get("source")
+        if not isinstance(source, str) or not (source == "." or source.startswith("./")):
+            errors.append(f"{m}: plugin entry {plugin_name!r} source must be a relative path "
+                          f"(`.` or `./...`), got {source!r}")
+            return
+        if (root / source).resolve() != root.resolve():
+            errors.append(f"{m}: plugin entry {plugin_name!r} source {source!r} must resolve to the "
+                          "repository root")
+            return
+        if not any((d / "SKILL.md").is_file() for d in (root / "skills").glob("*/")):
+            errors.append(f"{m}: plugin source {source!r} has no skills/<name>/SKILL.md directories")
+
+
+def check_mcp_servers(plugin: dict, where: str, errors: list[str]) -> None:
+    servers = plugin.get("mcpServers")
+    if not isinstance(servers, dict) or not servers:
+        errors.append(f"{where}: `mcpServers` must bundle the {MCP_PACKAGE} server inline")
+        return
+    user_config = plugin.get("userConfig") or {}
+    if not isinstance(user_config, dict):
+        errors.append(f"{where}: `userConfig` must be an object")
+        user_config = {}
+    found = False
+    for name, server in servers.items():
+        if not isinstance(server, dict):
+            errors.append(f"{where}: mcpServers.{name} must be an object")
+            continue
+        args = server.get("args") or []
+        packages = [a for a in args if isinstance(a, str) and a.split("@")[0] == MCP_PACKAGE]
+        if not packages:
+            continue
+        found = True
+        for package in packages:
+            if not MCP_PIN_RE.match(package):
+                errors.append(f"{where}: mcpServers.{name} runs `{package}`; pin a major version "
+                              f"as `{MCP_PACKAGE}@<major>` (KTD8)")
+        env = server.get("env") or {}
+        if not isinstance(env, dict):
+            errors.append(f"{where}: mcpServers.{name}.env must be an object")
+            continue
+        for var, value in env.items():
+            for key in USER_CONFIG_REF_RE.findall(str(value)):
+                option = user_config.get(key)
+                if not isinstance(option, dict):
+                    errors.append(f"{where}: mcpServers.{name}.env.{var} references undeclared "
+                                  f"`userConfig.{key}`")
+                elif var == TOKEN_ENV and option.get("sensitive") is not True:
+                    errors.append(f"{where}: `userConfig.{key}` holds {TOKEN_ENV} and must set "
+                                  "`\"sensitive\": true`")
+        token = env.get(TOKEN_ENV)
+        if not isinstance(token, str) or not USER_CONFIG_REF_RE.search(token):
+            errors.append(f"{where}: mcpServers.{name}.env.{TOKEN_ENV} must come from a sensitive "
+                          "`${user_config.KEY}`, never a literal")
+    if not found:
+        errors.append(f"{where}: no mcpServers entry runs `{MCP_PACKAGE}@<major>`")
+
+
 # ------------------------------------------------------------------ versioning
 
 def git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -493,6 +615,7 @@ def validate(root: Path = DEFAULT_ROOT, base: str | None = None,
     check_banned(root, errors)
     check_endpoints_and_bodies(root, Spec(root), errors)
     check_reference(root, errors)
+    check_manifests(root, errors)
     check_versioning(root, resolve_base(base, env), errors, notes)
     return errors, notes, len(dirs)
 
