@@ -10,6 +10,19 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.2.0 - Unreleased
+
+Pack version 1.2.0.
+
+### Added
+
+- **three.js clients** (`gameye-web-server` 1.1.0). A new reference,
+  `references/threejs-client.md`, covers the browser half of a 3D web game: joining with a
+  backend-issued token, snapshot interpolation for remote players, prediction and
+  reconciliation for the local player, a shared movement step, headless physics with
+  Rapier or cannon-es, and keeping the client out of the server image. A new eval prompt
+  checks it.
+
 ## 1.1.0 - Unreleased
 
 Pack version 1.1.0; `gameye-containerize` 1.1.0, `gameye` 1.0.2.
