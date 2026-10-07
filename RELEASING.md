@@ -34,6 +34,16 @@ Publish `gameye-mcp` (or, at minimum, a name-reserving placeholder) **before the
 - Push `main` for `gameye-mcp` first, then `gameye-skills`.
 - Set the default branch to `main`, add descriptions and topics, and enable private vulnerability reporting or point to `SECURITY.md`.
 - Confirm the first CI runs on `main` are green in both repos.
+- Check that the issue templates show up under **New issue** in both repos. Blank issues are off. Security and account problems link out to the helpdesk.
+
+### 2a. Point bug reports at GitHub Issues — when the repos go public
+
+While the repos are private, users can't see them, so the gameye-mcp beta notice and READMEs send bug reports to the helpdesk. Once both repos are public:
+
+- In gameye-mcp `src/beta.ts`, change the reporting line to `https://github.com/gameye/gameye-mcp/issues`. Add a warning never to paste tokens or session IDs there, and keep the helpdesk (https://helpdesk.gameye.com/) for account, session and billing problems. Update the matching assertions in `tests/unit/registration.test.ts` and `tests/unit/context.test.ts`.
+- Add a short "Reporting bugs" section to both READMEs, next to the Security section. It points to each repo's own Issues tab (`https://github.com/gameye/gameye-skills/issues` for skills), carries the same never-paste-tokens warning, and sends account problems to the helpdesk.
+- Leave `SECURITY.md` alone. Vulnerabilities are always reported privately.
+- Release a gameye-mcp patch version so the new notice reaches installed users.
 
 ### 3. Branch protection on `main` — needs Andrew's approval
 
