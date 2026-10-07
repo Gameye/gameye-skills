@@ -10,10 +10,10 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
-## 1.0.0 - Unreleased
+## 1.0.1 - Unreleased
 
-First public release. Pack version 1.0.0; all eleven skills are at `metadata.version`
-1.0.0.
+First public release. Pack version 1.0.1; `gameye` and `gameye-matchmaking` are at
+`metadata.version` 1.0.1 and the other nine skills are at 1.0.0.
 
 Eval baseline: pending
 
@@ -58,6 +58,9 @@ Eval baseline: pending
   a fresh one".
 - A duplicate token `name` returns `500`, not `409`. The skills say to give every token
   name a unique suffix and not to retry a token-create `500` with the same name.
+- The Pragma matchmaking integration is now named correctly (it was misspelled) and
+  described as Pragma Engine, a game backend whose matchmaking can request Gameye sessions
+  when a match forms.
 
 ### Removed
 
