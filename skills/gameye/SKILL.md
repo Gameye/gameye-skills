@@ -2,12 +2,12 @@
 name: gameye
 description: Ship and host a multiplayer game on Gameye, the managed dedicated game server platform (Docker image in, ip:port out). Use this skill whenever the user mentions Gameye, wants to host or deploy a multiplayer game server, asks how players will connect to matches, wants dedicated servers for a Unity/Unreal/Godot/web game, or has built a game and asks how to run its multiplayer backend — even if they never say the word "hosting". It orients on the platform, picks the right API host for the customer's tier, explains when to use the Gameye MCP tools versus HTTP, and routes to the specialized gameye-* skills for server design, engine builds, containerization, the sessions API, matchmaking, testing, and launch.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Gameye
 
-Pack version: 1.0.0
+Pack version: 1.0.1
 
 Gameye is managed dedicated game server hosting. The whole platform reduces to one
 interaction: you push a Docker image of your game server to your registry, and your
@@ -64,7 +64,7 @@ requires. The engine skills only add build-pipeline specifics.
 | Call the Gameye API, mint tokens, read logs or artifacts | `gameye-sessions-api` |
 | Connect a registry, set up a webhook, enable or retain tags | `gameye-containerize` |
 | Pick regions, allocate servers for matches, backfill | `gameye-matchmaking` |
-| Use an existing matchmaking integration (Nakama, Prokma, Photon Fusion, Unity Matchmaker) | `gameye-matchmaking` |
+| Use an existing matchmaking integration (Nakama, Pragma, Photon Fusion, Unity Matchmaker) | `gameye-matchmaking` |
 | Test locally before using real capacity | `gameye-local-testing` |
 | Go live with real players | `gameye-launch` |
 

@@ -15,7 +15,7 @@ Every item must hold, in both repos, before step 1:
 - [ ] Sandbox smoke passed with a low-scope sandbox token: launch, describe, join, logs, stop through `gameye-mcp`.
 - [ ] Install smoke passed: `npx skills add --list` against a local checkout, and local Claude Code plugin marketplace add.
 - [ ] `CHANGELOG.md` entry for the release in each repo; skills `Pack version:` and per-skill `metadata.version` match the entry; `gameye-mcp` `package.json` version matches its entry.
-- [ ] Partner names in the skills (Prokma, Nakama, Photon Fusion) confirmed as publicly announced integrations, or the wording changed before publish.
+- [ ] Partner names in the skills (Pragma, Nakama, Photon Fusion) confirmed as publicly announced integrations, or the wording changed before publish.
 - [ ] `npm pack --dry-run` file list for `gameye-mcp` reviewed (CI asserts it; a human reads it once).
 
 ## Release steps

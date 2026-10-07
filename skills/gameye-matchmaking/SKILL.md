@@ -1,8 +1,8 @@
 ---
 name: gameye-matchmaking
-description: Wire matchmaking to Gameye so a formed match reliably becomes a running server with connected players — allocator patterns, idempotent session creation, latency-based region selection, backfill, and the Nakama/Prokma/Photon Fusion/Unity Matchmaker integrations. Use whenever building a matchmaker or allocator, connecting an existing matchmaking service to dedicated servers, or when the user asks how players get into a match, how to pick a region, how to backfill sessions, or how to handle allocation failures.
+description: Wire matchmaking to Gameye so a formed match reliably becomes a running server with connected players — allocator patterns, idempotent session creation, latency-based region selection, backfill, and the Nakama/Pragma/Photon Fusion/Unity Matchmaker integrations. Use whenever building a matchmaker or allocator, connecting an existing matchmaking service to dedicated servers, or when the user asks how players get into a match, how to pick a region, how to backfill sessions, or how to handle allocation failures.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Matchmaking on top of Gameye sessions
@@ -112,7 +112,7 @@ player-tracking endpoints aren't optional bookkeeping, they're what makes
 | Matchmaker | How it meets Gameye | Allocator role |
 |---|---|---|
 | Nakama (Heroic Labs) | Nakama's match lifecycle can drive Gameye session management | Your Nakama match handler calls `POST /session` |
-| Prokma | Matchmaking service that can call the Gameye API when a group forms | Handled by the service; little developer-side glue |
+| Pragma (Pragma Engine) | Game backend whose matchmaking can request Gameye sessions when a match forms | Handled by Pragma Engine; little developer-side glue |
 | Photon Fusion | Fusion dedicated-server builds can run as Gameye sessions | Fusion's session management pairs with the allocation flow above |
 | Unity Matchmaker (UGS) | A Cloud Code module acts as the allocator when a match is formed | Your Cloud Code module calls `POST /session` from the server side and returns the address |
 | EOS / PlayFab (common with Unreal) | Their matchmaking forms groups | Your backend runs the generic allocator flow here |
