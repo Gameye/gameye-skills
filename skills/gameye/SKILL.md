@@ -2,12 +2,12 @@
 name: gameye
 description: Ship and host a multiplayer game on Gameye, the managed dedicated game server platform (Docker image in, ip:port out). Use this skill whenever the user mentions Gameye, wants to host or deploy a multiplayer game server, asks how players will connect to matches, wants dedicated servers for a Unity/Unreal/Godot/web game, or has built a game and asks how to run its multiplayer backend — even if they never say the word "hosting". It orients on the platform, picks the right API host for the customer's tier, explains when to use the Gameye MCP tools versus HTTP, and routes to the specialized gameye-* skills for server design, engine builds, containerization, the sessions API, matchmaking, testing, and launch.
 metadata:
-  version: "1.0.2"
+  version: "1.1.0"
 ---
 
 # Gameye
 
-Pack version: 1.2.0
+Pack version: 1.3.0
 
 Gameye is managed dedicated game server hosting. The whole platform reduces to one
 interaction: you push a Docker image of your game server to your registry, and your
@@ -71,7 +71,8 @@ requires. The engine skills only add build-pipeline specifics.
 ## Vocabulary you'll see everywhere
 
 - **Application** — your game server as Gameye knows it: an image alias (e.g.
-  `"mygame"`, not a full registry path), its port bindings, and a resource profile
+  `"mygame"`, not a full registry path), its port bindings (a port marked `"tls": true`
+  gets Gameye-managed TLS, so browser clients use `wss://ip:port`), and a resource profile
   (guaranteed CPU/memory — never oversubscribed). Usually configured in the Admin
   Panel.
 - **Session** — one running container, usually one match. Lifecycle:

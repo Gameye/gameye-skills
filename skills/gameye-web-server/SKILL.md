@@ -1,8 +1,8 @@
 ---
 name: gameye-web-server
-description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and the Dockerfile variant for Node servers. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
+description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, managed TLS (wss) for browser clients served over https, and the Dockerfile variant for Node servers. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Web game servers on Gameye
@@ -28,7 +28,7 @@ and headless physics.
 
 Either way the process serves **one TCP port** for both HTTP (health endpoint, join
 handshake) and the WebSocket upgrade — register it as TCP in your Gameye
-application's port bindings.
+application's port bindings, with `"tls": true` (see TLS below).
 
 ## The authoritative core
 
@@ -95,34 +95,46 @@ matches actually end; exit 0 on match end and on SIGTERM.
 ## TLS and mixed content — decide this early
 
 A game page served over `https://` **cannot open `ws://`** to a raw `ip:port` —
-browsers block mixed content. A Gameye session hands you exactly a raw `ip:port`.
-Every browser game must pick one of:
+browsers block mixed content. Use Gameye's managed TLS:
 
-1. **Per-session DNS + wildcard cert** (the production pattern). Your allocator, on
-   session start, creates a DNS A record `s-<sessionId>.play.yourgame.example` →
-   session host IP (any DNS provider with an API; low TTL). The Node server
-   terminates TLS itself (`https.createServer` + `WebSocketServer`) with a wildcard
-   certificate for `*.play.yourgame.example`, and clients connect
-   `wss://s-<id>.play.yourgame.example:<hostPort>`. Scope the wildcard to a dedicated
-   subdomain used for nothing else, so a leaked key can impersonate game sessions
-   and nothing more.
+1. **Mark the game port `"tls": true`** in the application's port bindings. Gameye
+   then terminates TLS on the host with an automatically renewed certificate for
+   the session's IP address. Your server is unchanged: it still speaks plain `ws`
+   on that container port (`createServer` from `http`, as above). No DNS records,
+   no certificates, no keys on your side.
 
-   The server fetches the key at boot from your backend over an authenticated call
-   (a deliberate, tiny exception to "no downloads at boot"). It presents its
-   short-lived per-match join secret and `MATCH_ID` from env; your backend checks the
-   secret against the one it issued for that match and confirms a live session for it
-   (for example `GET /session?filter[match-id]=<MATCH_ID>`, or the session ID it
-   recorded at allocation) before returning the key. An unauthenticated key endpoint
-   hands every session hostname to anyone who finds it. Never bake the key into the
-   image (registries are not secret stores) and never pass it in session `env`, which
-   any `session:read` token in your organization can read. Renew the certificate on
-   your backend; servers pick up the new key on their next boot.
-2. **Non-browser packaging** — Electron/Tauri/mobile wrappers aren't subject to
-   mixed-content rules and may use `ws://ip:port` directly.
-3. **Plain-HTTP page** during development only. Fine on `http://localhost`, not
-   shippable.
+   ```json
+   { "ports": [ { "requested": 8080, "protocol": "tcp", "tls": true } ] }
+   ```
 
-Build the join flow around option 1 unless the game will never ship in a browser.
+   Set it **when the application is created** (`POST /application`, see
+   `gameye-sessions-api`), or ask Gameye support to set it. Editing an application's
+   ports (`PUT /application/{name}`) does not apply the flag: ports sent through edit
+   end up `tls=false`. `GET /application` shows the current value.
+2. **Clients connect `wss://<host>:<hostPort>`**, using the `host` and the game
+   port's `ports[].host` from the session start (or describe) response, exactly as
+   a native client would use `host:hostPort`.
+3. **Verify the first connection in a real browser** before you build on it: load
+   the game from its `https://` page against a sandbox session in each region you
+   launch in, and confirm in devtools (Network → WS) that the `wss://` connection
+   opens with no certificate error. If it doesn't, contact Gameye support rather
+   than working around it.
+
+Other cases:
+
+- **You need a named hostname** (for example, a policy that requires one) — the
+  fallback is per-session DNS plus a wildcard certificate: on session start your
+  allocator creates an A record `s-<sessionId>.play.yourgame.example` → session IP,
+  the server terminates TLS itself with a cert for `*.play.yourgame.example` (on a
+  port without `"tls": true`), and clients connect
+  `wss://s-<id>.play.yourgame.example:<hostPort>`. Scope the wildcard to a dedicated
+  subdomain; have the server fetch the key at boot from your backend over a call
+  authenticated by its per-match join secret, checked against a live session; never
+  bake the key into the image or pass it in session `env`; renew it on your backend.
+- **Non-browser packaging** — Electron/Tauri/mobile wrappers aren't subject to
+  mixed-content rules and may use `ws://ip:port` directly.
+- **Local development** — a plain-HTTP page on `http://localhost` with `ws://` to a
+  local container. TLS only applies on Gameye; see `gameye-local-testing`.
 
 ## Container specifics
 

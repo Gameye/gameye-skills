@@ -2,7 +2,7 @@
 name: gameye-local-testing
 description: Prove a game server container behaves identically on a laptop and on Gameye before deploying — parity docker runs, the forced port-asymmetry test, the SIGTERM drain test, boot timing, and the sandbox smoke test sequence. Use before any first deploy or new tag rollout, when a server works locally but fails on Gameye, or when the user mentions testing a game server container, docker run testing, or a Gameye sandbox smoke test.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Testing before you deploy
@@ -23,6 +23,11 @@ docker run --rm --name mygame-test \
   -p 25000:7777/udp \
   mygame:dev --tickrate=30
 ```
+
+Browser games test locally over plain `ws://localhost:<hostPort>` from an
+`http://localhost` page: the container never speaks TLS. TLS only applies on Gameye,
+where a `"tls": true` port is terminated on the host (`gameye-web-server`), so don't
+add certificates to the image to make local tests look like production.
 
 Checks, in order:
 
@@ -97,7 +102,8 @@ starting the session — it is billed.
                                              → 201; note id, host + ports from the response
 4. GET  /session/{id}                        → status reaches "running"
 5. GET  /logs?id={id}&follow=false           → boot line + READY visible
-6. Connect a real client to host:hostPort    → gameplay works
+6. Connect a real client to host:hostPort    → gameplay works (browser game on a
+                                               "tls": true port: wss://host:hostPort)
 7. DELETE /session/{id}                      → 204; drain visible in logs
 8. Poll describe until "exited", then
    GET /artifacts?session={id}&path=/app/out → uncompressed tar with the expected files

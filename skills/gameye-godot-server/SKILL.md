@@ -2,7 +2,7 @@
 name: gameye-godot-server
 description: Produce a Godot 4 dedicated server build that runs on Gameye — the dedicated_server export feature, headless mode, high-level multiplayer with ENet or WebSocket, runtime configuration, and the Dockerfile variant for Godot server builds. Use whenever building or debugging a Godot multiplayer server, exporting a Godot headless Linux build, or when the user mentions Godot dedicated servers, ENetMultiplayerPeer, or hosting a Godot game on Gameye.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Godot 4 dedicated servers on Gameye
@@ -54,8 +54,9 @@ func _ready() -> void:
 - **ENet** (UDP) for desktop/mobile clients — register the port as UDP in your Gameye
   application's port bindings.
 - **WebSocketMultiplayerPeer** (TCP) when clients are browsers (Godot web export) —
-  then the TLS/mixed-content reality in `gameye-web-server` applies to you too; read
-  that section before shipping a browser-facing Godot server.
+  mark that port `"tls": true` in the application and have web clients connect
+  `wss://<host>:<hostPort>`; the server keeps plain WebSocket. Read the TLS section
+  of `gameye-web-server` before shipping a browser-facing Godot server.
 
 Authority discipline: mark server-owned state, validate RPCs
 (`@rpc("any_peer")` handlers must treat `multiplayer.get_remote_sender_id()` as

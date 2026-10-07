@@ -2,7 +2,7 @@
 name: gameye-launch
 description: Take a Gameye-hosted game from "the smoke test passes" to live players — the launch checklist, the right API host for the customer's tier, token hygiene and scopes, tag and rollout strategy, TTL and cost control, capacity and quota behavior, observability, and incident basics. Use when preparing a launch or playtest on Gameye, reviewing production readiness, or when the user mentions going live, launch day, rollout, or operating game servers with real players.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Launching and operating on Gameye
@@ -41,6 +41,9 @@ the user's backend always calls HTTP.
 
 **Application configuration (Admin Panel)**
 - Port bindings match the Dockerfile `EXPOSE` and what the server binds.
+- Browser game served over https: the WebSocket port has `"tls": true` (set at
+  application creation; edit doesn't apply it), and a real browser has opened
+  `wss://<host>:<hostPort>` to a session in each launch region (`gameye-web-server`).
 - Resource profile sized from measured full-match load (`docker stats` numbers from
   `gameye-local-testing`) plus margin — it's guaranteed *and* billed; both
   undersizing and oversizing are real costs, one in player experience, one in money.

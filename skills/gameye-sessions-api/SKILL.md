@@ -2,7 +2,7 @@
 name: gameye-sessions-api
 description: The Gameye REST API for starting, listing, inspecting, and stopping game server sessions, plus player tracking, logs, artifacts, tokens and scopes, applications and tags, regions, and locations. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via the API, minting or scoping Gameye tokens, or when the user mentions starting game servers programmatically, session endpoints, api.sandbox-gameye.gameye.net, api.production-gameye.gameye.net, warm pools, or Gameye error codes. Registry and webhook setup is in gameye-containerize. Load it rather than guessing endpoint shapes — several requests and responses differ from what the published schema suggests.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Gameye sessions API
@@ -282,7 +282,9 @@ An application is usually created and edited in the Admin Panel. The API equival
 (`POST /application`, `PUT /application/{name}`) need `application:write`; treat them
 as admin actions and confirm with the user before calling them. `GET /application`
 lists applications with their registry, repository, `tagKeep`, resources, regions and
-port bindings.
+port bindings. Each port binding is `{requested, protocol, tls}`; `"tls": true` makes
+Gameye terminate TLS on the host so browser clients connect `wss://<host>:<hostPort>`
+(see `gameye-web-server`). Set `tls` at creation: edit does not apply it.
 
 Tag procedure (registry and webhook setup itself is in `gameye-containerize`):
 

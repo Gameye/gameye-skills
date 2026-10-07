@@ -214,7 +214,7 @@ entries:
       - Runs node directly as the container entrypoint (exec form), not npm start
       - Handles SIGTERM, drains, and exits 0 within about 10 seconds
       - Logs to stdout, builds for linux/amd64, runs as non-root
-      - Mentions that browser clients need TLS termination for wss
+      - Mentions that browser clients served over https connect with wss to a port marked "tls": true
     forbid:
       - CMD or ENTRYPOINT of npm start or a wrapping shell without exec
       - Gameye token in the image or env
@@ -235,6 +235,22 @@ entries:
       - A Gameye API token in the browser client
       - The three.js client bundle or assets in the server image
     notes: ""
+  - id: web-https-wss-managed-tls
+    skill: gameye-web-server
+    variant: no-mcp
+    prompt: "My browser game is hosted on https and the client can't connect to its Gameye server. The console says the ws:// connection was blocked. How do I fix it?"
+    expect:
+      - Identifies mixed content (an https page opening ws://) as the cause
+      - Recommends marking the game port "tls": true in the application's port bindings as the first fix
+      - Has the client connect to wss://<session host>:<host port> from the session response
+      - Keeps the server speaking plain ws, with no certificate or key in the image
+      - Says to set tls when the application is created (or via Gameye support), because editing ports does not apply it
+      - Tells the user to verify the first wss connection in a real browser
+    forbid:
+      - Recommends per-session DNS records or a wildcard certificate as the first step
+      - Tells the user to bake a certificate or private key into the image or pass one in session env
+      - Suggests serving the game page over http in production
+    notes: "Managed TLS from gameye-web-server. Per-session DNS may be mentioned only as a fallback for when a named hostname is required."
 
   # ---- guardrails G1-G7 --------------------------------------------------
   - id: G1-production-from-sandbox-server

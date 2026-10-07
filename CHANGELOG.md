@@ -10,6 +10,19 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.3.0 - Unreleased
+
+Pack version 1.3.0.
+
+### Changed
+
+- **Managed TLS for browser games** (`gameye-web-server` 1.2.0, `gameye` 1.1.0;
+  `gameye-sessions-api`, `gameye-godot-server`, `gameye-launch` and `gameye-local-testing`
+  1.0.1). `gameye-web-server` leads with marking the game port `"tls": true` so Gameye
+  terminates TLS on the host and browser clients connect `wss://<host>:<hostPort>` with no
+  DNS or certificate work; per-session DNS plus a wildcard certificate remains as a
+  fallback when a named hostname is required. The other skills and the evals are aligned.
+
 ## 1.2.0 - Unreleased
 
 Pack version 1.2.0.
