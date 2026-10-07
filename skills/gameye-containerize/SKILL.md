@@ -2,7 +2,7 @@
 name: gameye-containerize
 description: Package a game server into a Docker image that runs correctly on Gameye, and get it from your registry to a launchable tag — the container contract, Dockerfile patterns, Docker Hub / AWS ECR / GHCR access for Gameye, registry webhooks, enabling tags, and tag retention. Use whenever writing a Dockerfile for a game server, containerizing a dedicated server build, building on Apple Silicon, debugging a server that works locally but not in a container, setting up a registry or webhook for Gameye, or when the user mentions Docker images, registries, gameyedocker, tags, or deploying a server build to Gameye. Applies to every engine; use it alongside the engine-specific gameye-*-server skills. API calls for tags and applications (checking, enabling, launching a version) live in gameye-sessions-api.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Containerizing a game server for Gameye
@@ -139,22 +139,27 @@ registry; full click paths, webhook fields and troubleshooting are in
 |---|---|
 | Docker Hub | Add `gameyedocker` as a **read-only** collaborator on the private repository. |
 | AWS ECR | Pull access is configured with Gameye during onboarding — ask your Gameye contact. |
-| GHCR (`ghcr.io`) | *Confirm with Gameye support that GHCR is enabled for your environment first — GHCR support is not generally released.* Package settings → Manage access → invite `gameyedocker` with **Read**. If Invite is missing, untick **Inherit access from source repository**. Never share via a personal-account repository: it has no Read role, so that grants write. |
+| GHCR (`ghcr.io`) | Self-serve only; the zero-cost private option ([guide](https://gameye.com/docs/getting-started/ghcr/)). The image owner must equal your Gameye organization name (the org key on trial orgs). Package settings → Manage access → invite `gameyedocker` with **Read**; org-owned packages also need `gameyedocker` invited to the org, which Gameye accepts. If Invite is missing, untick **Inherit access from source repository**. Never share via a personal-account repository: it has no Read role, so that grants write. |
 
 **2. Register the application** in the Admin Panel (or `POST /application`) with
 the registry and the repository *without* a tag, ports, resources, regions and
-node pool. `tagKeep` ("Tags to keep") sets how many tags stay warm.
+node pool. `tagKeep` ("Tags to keep") sets how many tags stay warm. Copy the
+repository exactly: a mistyped one is saved without validation and shows only
+"No tags available".
 
 **3. Make each new tag launchable** — either:
 
 - **Webhook (automatic):** the registry notifies Gameye on every push and the tag
   is registered. Docker Hub posts to
   `https://anything:<TOKEN>@<host>/v1/integrations/dockerhub` with a
-  `webhook:dockerhub` token as the password. GitHub (GHCR, same enablement caveat)
-  posts to `https://<host>/v1/integrations/github/<ORGANIZATION-ID>` with a
+  `webhook:dockerhub` token as the password. GitHub (GHCR) posts to
+  `https://<host>/v1/integrations/github/<ORGANIZATION-ID>` (copy the exact URL from
+  the GitHub webhook panel on the application's page in the Admin Panel) with a
   `webhook:github`-only token as the signing secret and only the **Packages** event.
   GitHub deliveries can lag a few minutes, and pushing an image identical to an
   existing version sends nothing — the revision label above keeps each build unique.
+  A `docker/build-push-action` build must set `provenance: false`: its default build
+  attestation makes GitHub send no package webhook at all.
 - **Manual:** list what Gameye can see in the registry with
   `GET /application/{name}/tags/available`, then enable the exact tag with
   `POST /application/{name}/tags` and body `{"tag": "<sha>"}` (204 on success), or

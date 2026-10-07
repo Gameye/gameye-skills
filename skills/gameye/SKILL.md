@@ -2,12 +2,12 @@
 name: gameye
 description: Ship and host a multiplayer game on Gameye, the managed dedicated game server platform (Docker image in, ip:port out). Use this skill whenever the user mentions Gameye, wants to host or deploy a multiplayer game server, asks how players will connect to matches, wants dedicated servers for a Unity/Unreal/Godot/web game, or has built a game and asks how to run its multiplayer backend — even if they never say the word "hosting". It orients on the platform, picks the right API host for the customer's tier, explains when to use the Gameye MCP tools versus HTTP, and routes to the specialized gameye-* skills for server design, engine builds, containerization, the sessions API, matchmaking, testing, and launch.
 metadata:
-  version: "1.0.1"
+  version: "1.0.2"
 ---
 
 # Gameye
 
-Pack version: 1.0.1
+Pack version: 1.1.0
 
 Gameye is managed dedicated game server hosting. The whole platform reduces to one
 interaction: you push a Docker image of your game server to your registry, and your
@@ -110,8 +110,8 @@ short-lived ones programmatically when automation needs them. The Gameye token l
 in the user's backend only; it never goes into a game server container or session
 `env`.
 
-Registry integration (Docker Hub, AWS ECR, and GHCR where Gameye has enabled it for
-your environment) is configured once; after that, registry webhooks register new tags
+Registry integration (Docker Hub, AWS ECR, or GHCR, the free private option on
+self-serve) is configured once; after that, registry webhooks register new tags
 and Gameye preloads them onto its fleet. You never push images to Gameye directly.
 See `gameye-containerize`.
 
