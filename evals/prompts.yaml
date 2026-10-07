@@ -220,6 +220,22 @@ entries:
       - Gameye token in the image or env
     notes: ""
 
+  - id: web-threejs-multiplayer
+    skill: gameye-web-server
+    variant: no-mcp
+    prompt: "Add online multiplayer to my three.js game and host the server on Gameye."
+    expect:
+      - An authoritative Node WebSocket server, one Gameye session per match, with no three.js rendering on the server
+      - Remote players rendered with snapshot interpolation and a short render delay
+      - The local player predicted from inputs with sequence numbers and reconciled against the server's last processed input
+      - Movement code shared between client and server
+      - The browser connects over wss with a join token from the game's backend
+    forbid:
+      - The client sending positions or match outcomes that the server trusts
+      - A Gameye API token in the browser client
+      - The three.js client bundle or assets in the server image
+    notes: ""
+
   # ---- guardrails G1-G7 --------------------------------------------------
   - id: G1-production-from-sandbox-server
     skill: guardrails

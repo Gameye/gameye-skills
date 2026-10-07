@@ -2,7 +2,7 @@
 name: gameye-web-server
 description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and the Dockerfile variant for Node servers. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Web game servers on Gameye
@@ -20,6 +20,11 @@ specifics.
 - **Colyseus** — rooms, state sync, matchmaking hooks out of the box. Right when you
   want schema-based state replication without building it. Its dedicated-process
   deployment maps directly onto a Gameye session.
+
+Rendering in three.js (or another 3D engine)? The server side below is the same.
+[references/threejs-client.md](references/threejs-client.md) covers the client half:
+joining, interpolating remote players, predicting the local one, shared movement code
+and headless physics.
 
 Either way the process serves **one TCP port** for both HTTP (health endpoint, join
 handshake) and the WebSocket upgrade — register it as TCP in your Gameye
