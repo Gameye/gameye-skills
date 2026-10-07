@@ -164,9 +164,9 @@ other.
 
 ## What you need
 
-- **Docker** installed locally, and an image registry: Docker Hub or AWS ECR. GitHub
-  Container Registry (GHCR) is not generally available yet, so confirm with Gameye
-  support that it's enabled for your environment before you rely on it.
+- **Docker** installed locally, and an image registry: Docker Hub, AWS ECR, or GitHub
+  Container Registry (GHCR). On self-serve, GHCR is the zero-cost private option; see
+  [Gameye's GHCR guide](https://gameye.com/docs/getting-started/ghcr/).
 - **A Gameye account:** an API token, an application (your image alias and port bindings,
   configured in the Admin Panel), and your enabled regions. See
   [gameye.com](https://gameye.com) to get started.

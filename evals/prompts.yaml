@@ -83,7 +83,7 @@ entries:
       - Builds with docker buildx build --platform=linux/amd64
       - Tags the image with an immutable git SHA and stamps org.opencontainers.image.revision with the same SHA
       - Uses ENTRYPOINT exec form with exec in the entrypoint script, non-root user, EXPOSE matching the application port
-      - Warns that GHCR is not generally released and to confirm with Gameye support that it is enabled for the environment
+      - Says the GHCR image owner must equal the Gameye organization name and the application repository must be copied exactly
       - Says to grant gameyedocker Read access and untick Inherit access if Invite is missing
       - Covers making the tag launchable, either via the GitHub webhook (Packages event) or by enabling the exact tag with POST /application/{name}/tags
       - Recommends confirming the tag per region with GET /tag/{region}/{image}/{version} before launching
@@ -92,6 +92,7 @@ entries:
       - Relies on latest or an unpinned tag for launches
       - Suggests pushing the image to Gameye directly
       - Puts a Gameye token in the Dockerfile or build args
+      - Says GHCR is not generally available or must first be confirmed with Gameye support
     notes: "Registry guidance."
 
   # ---- matchmaking -------------------------------------------------------

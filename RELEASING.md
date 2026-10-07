@@ -70,9 +70,9 @@ Installed skills and the plugin update automatically, so an unreviewed merge shi
 
 Once the npm package is stable (and the registry is out of preview): add `server.json` and the `mcpName` field to `gameye-mcp`'s `package.json`, then publish to the MCP Registry.
 
-### 7. Drop the GHCR "confirm with support" condition — needs Andrew's approval
+### 7. Drop the GHCR "confirm with support" condition — done
 
-When GHCR support is generally released (docs page live, private pulls and the GHCR webhook enabled on both sandbox and production), remove the "confirm with Gameye support that GHCR is enabled for your environment" condition from the skills, following the versioning rule in `CONTRIBUTING.md`.
+- [x] GHCR became generally available on self-serve (sandbox) on 2026-10-07, with the public guide at https://gameye.com/docs/getting-started/ghcr/. The skills no longer tell users to confirm with support, and present GHCR as a self-serve registry option (pack version 1.1.0). Enterprise production does not have GHCR yet; when it does, update the "self-serve only" wording.
 
 ## Core follow-ups for maintainers
 
@@ -83,7 +83,8 @@ These are changes in the private core repository, found while verifying the skil
 - [ ] Decide whether enable-tag's server-side `regions:read` scope check is a bug (the spec says `application:write`). If core changes it, update the overrides entry and the least-privilege token recipes.
 - [ ] Document the logs `follow` default in the spec.
 - [ ] Document the artifacts response compression (plain tar or gzip) in the spec.
-- [ ] Make the organization ID needed for the GitHub webhook URL discoverable to customers (API or dashboard).
-- [ ] Enable the GHCR webhook (and private GHCR pulls) on sandbox and production; this unblocks step 7.
+- [x] Make the organization ID needed for the GitHub webhook URL discoverable to customers: the Admin Panel's application page shows the full webhook URL (2026-10-07).
+- [x] Enable the GHCR webhook and private GHCR pulls on sandbox (generally available 2026-10-07).
+- [ ] Enable GHCR on enterprise production.
 - [ ] Clarify the spec wording for what happens when `version` is omitted from a session launch.
 - [ ] Document the warm-pool cold-start fallback behavior (what happens when no warm instance is available).

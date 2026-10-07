@@ -10,6 +10,21 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.1.0 - Unreleased
+
+Pack version 1.1.0; `gameye-containerize` 1.1.0, `gameye` 1.0.2.
+
+### Changed
+
+- **GHCR is generally available on self-serve** (from 2026-10-07). The skills drop the
+  "confirm with Gameye support" condition and present GHCR alongside Docker Hub and AWS
+  ECR as the zero-cost private option, with its gotchas: image owner must equal the
+  Gameye organization name, org-owned packages need an org invite, the repository is
+  saved unvalidated ("No tags available" on a typo), a `docker/build-push-action` build
+  needs `provenance: false` or GitHub sends no package webhook, and the webhook URL is
+  shown on the application page in the Admin Panel. Enterprise production does not have
+  GHCR yet.
+
 ## 1.0.1 - Unreleased
 
 First public release. Pack version 1.0.1; `gameye` and `gameye-matchmaking` are at
@@ -32,8 +47,7 @@ Eval baseline: pending
   host's live `/openapi.yaml` for the authoritative schema.
 - **Registry guidance for Docker Hub, AWS ECR and GHCR.** Granting `gameyedocker` Read
   access (including unticking GHCR's inherited access), enabling tags, webhook
-  registration with delivery-delay and identical-image caveats, and tag retention. GHCR
-  support must be confirmed with Gameye support for your environment.
+  registration with delivery-delay and identical-image caveats, and tag retention.
 - **Gameye MCP sister project.** The `gameye` skill introduces
   [gameye-mcp](https://github.com/gameye/gameye-mcp), shares one environment variable
   scheme (`GAMEYE_API_TOKEN`, `GAMEYE_ENV`) and one `gameye_*` tool naming scheme, and

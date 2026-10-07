@@ -62,12 +62,16 @@ your account.
 
 ## GitHub Container Registry (GHCR)
 
-> **Confirm with Gameye support that GHCR is enabled for your environment** before
-> relying on any of this — private pulls and the webhook both depend on it. GHCR
-> support is not generally released yet.
+GHCR is supported on the self-serve platform (the sandbox host) and is the
+zero-cost private registry option. Enterprise production does not support it yet.
+Gameye's public guide: <https://gameye.com/docs/getting-started/ghcr/>.
 
 The lowercase GitHub image owner must match your Gameye organization name (for
-`ghcr.io/studio-name/game-server`, the owner is `studio-name`). The image must
+`ghcr.io/studio-name/game-server`, the owner is `studio-name`; on trial
+organizations the name is the org key). Sign-up makes that name from the display name,
+lowercased with spaces removed, so "Studio Name" becomes `studioname` and won't match
+`studio-name`. A mismatch only breaks private packages, which never load; the Admin
+Panel warns about it, and Gameye support can rename the organization. The image must
 include `linux/amd64`.
 
 ### Access
@@ -88,12 +92,16 @@ have no Read role, so `gameyedocker` would get write access.
 ### Application
 
 Registry **GitHub Container Registry** (`ghcr`), Repository
-`ghcr.io/studio-name/game-server` — no tag in the repository field.
+`ghcr.io/studio-name/game-server` — no tag in the repository field. The
+repository is saved without validation: a typo fails silently and the tag picker
+shows "No tags available", so copy it exactly.
 
-### Webhook (optional, same enablement caveat)
+### Webhook (recommended)
 
-1. Ask Gameye support to confirm GHCR webhooks are enabled and for your
-   organization ID.
+With the webhook in place, new tags appear automatically.
+
+1. Open the application in the Admin Panel and copy the **Payload URL** from its
+   **GitHub webhook** panel. It already contains your organization ID.
 2. Mint the signing secret: a token with **only** the `webhook:github` scope,
    created with `POST /token` by a token that holds `token:write` (it does not need
    `webhook:github` itself). The token value is shown once.
@@ -117,6 +125,11 @@ Registry **GitHub Container Registry** (`ghcr`), Repository
 
 4. Check **Recent Deliveries**: the ping on save should show 200; then push a new
    tag.
+
+If CI builds with `docker/build-push-action`, set `provenance: false` on that step.
+Its default build attestation turns the push into an image index, and GitHub sends
+no package webhook for it: the ping succeeds but new tags never register. A plain
+`docker push` is unaffected.
 
 | Response | Meaning |
 |---|---|
