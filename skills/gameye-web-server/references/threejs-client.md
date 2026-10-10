@@ -30,7 +30,7 @@ your backend for a match, then connects to the address the backend returns:
 // Your own matchmaking backend, not the Gameye API.
 const { url, joinToken } = await fetch("https://backend.yourgame.example/join", { method: "POST" })
   .then((r) => r.json());
-// url is wss://s-<sessionId>.play.yourgame.example:<hostPort>, see "TLS and mixed content"
+// url is wss://<host>:<hostPort> from the session (port marked "tls": true), see "TLS and mixed content"
 const ws = new WebSocket(url);
 ws.binaryType = "arraybuffer";
 ws.addEventListener("open", () => ws.send(JSON.stringify({ type: "join", joinToken })));
