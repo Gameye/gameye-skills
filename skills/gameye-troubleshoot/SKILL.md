@@ -31,7 +31,8 @@ the one in question and check `repository`:
 | Capital letters (`ghcr.io/Studio/game`) | Docker requires lowercase | Change it to all lowercase |
 | `https://…` or `github.com/…` | A web address, not an image | `ghcr.io/<owner>/<package>`, or `<user>/<repository>` for Docker Hub |
 | A tag on the end (`…/game:1.2`) | The tag doesn't belong here | Remove it; tags are registered separately |
-| `ghcr.io/<owner>/<package>` with an owner that isn't the Gameye organization name | Gameye pulls a GHCR image only when its owner is the organization name | Push under that owner, or contact Gameye support about renaming the organization |
+| A private `ghcr.io/<owner>/<package>` with an owner that isn't the Gameye organization name | Gameye pulls a private GHCR image only when its lowercase owner matches the organization name | Push under that owner, or contact Gameye support about renaming the organization |
+| `ghcr.io/…` on the enterprise (production) platform | GHCR is supported on self-serve only | Use another registry (`gameye-containerize`) |
 
 The user changes `repository` in the Admin Panel, on the application's page.
 
@@ -55,8 +56,8 @@ Gameye pulls with its account `gameyedocker`. Go through the list with the user:
 1. **The image is where the application says.** The exact `repository` path exists in
    the registry, with the tag pushed to it. A common miss is an image still on Docker
    Hub while the application points at GHCR, or the other way round.
-2. **Public or private.** For GHCR, this returns `200` for a public package and `401`
-   for a private or missing one:
+2. **Public or private.** For GHCR, this returns `200` for a public package, and `401` or
+   `403` for a private or missing one (you can't tell which from the code):
    `curl -s -o /dev/null -w '%{http_code}' 'https://ghcr.io/token?scope=repository:<owner>/<package>:pull'`
 3. **Private: `gameyedocker` has Read on that package.** GHCR: Package settings →
    Manage access → Invite teams or people → `gameyedocker`, role Read. Access is per
