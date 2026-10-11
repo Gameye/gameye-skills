@@ -191,6 +191,14 @@ other.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository layout, where API facts come
 from, the checks CI runs, and the versioning rules for skill changes.
 
+## About Gameye
+
+[Gameye](https://gameye.com/?utm_source=github&utm_medium=readme&utm_campaign=gameye-skills) is a managed hosting platform for multiplayer game servers. You bring a container image, and Gameye starts a dedicated server for each match through one API.
+
+- Getting started: [gameye.com/docs/getting-started](https://gameye.com/docs/getting-started/?utm_source=github&utm_medium=readme&utm_campaign=gameye-skills)
+- Gameye docs: [gameye.com/docs](https://gameye.com/docs/?utm_source=github&utm_medium=readme&utm_campaign=gameye-skills)
+- Try it free: [trial.gameye.com](https://trial.gameye.com/?utm_source=github&utm_medium=readme&utm_campaign=gameye-skills)
+
 ## Security
 
 Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in
