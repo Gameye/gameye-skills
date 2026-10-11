@@ -10,6 +10,28 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.4.0 - Unreleased
+
+Pack version 1.4.0.
+
+### Added
+
+- **`gameye-troubleshoot`** (1.0.0). Diagnoses a deploy that isn't working from the
+  customer side: a malformed `repository`, a tag that never becomes `exists: true`,
+  Gameye unable to pull the image (path, public or private, `gameyedocker` access,
+  organization invitation, `linux/amd64`), what `404` and `420` from `POST /session`
+  mean, a server that exits on boot, and a missing region.
+
+### Changed
+
+- **`gameye-launch`** (1.0.1). A `420` for a tag that isn't downloaded in the region
+  yet is not a capacity problem, and retrying won't help. Links to
+  `gameye-troubleshoot`.
+- **`gameye-sessions-api`** (1.0.1). The generated API reference records when
+  `POST /session` returns `420` for a tag that isn't downloaded in the region yet.
+- **`gameye`** (1.0.3). The task table routes "why won't it load or start" to
+  `gameye-troubleshoot`.
+
 ## 1.3.0 - Unreleased
 
 Pack version 1.3.0.

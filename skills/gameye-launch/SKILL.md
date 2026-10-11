@@ -2,7 +2,7 @@
 name: gameye-launch
 description: Take a Gameye-hosted game from "the smoke test passes" to live players — the launch checklist, the right API host for the customer's tier, token hygiene and scopes, tag and rollout strategy, TTL and cost control, capacity and quota behavior, observability, and incident basics. Use when preparing a launch or playtest on Gameye, reviewing production readiness, or when the user mentions going live, launch day, rollout, or operating game servers with real players.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Launching and operating on Gameye
@@ -75,7 +75,9 @@ the user's backend always calls HTTP.
 ## Launch-day behavior
 
 - **Capacity**: Gameye runs bare metal per region and bursts to cloud automatically —
-  but `420` (no compute available) is still a possible answer under spikes. Your
+  but `420` (no compute available) is still a possible answer under spikes. A `420`
+  for a tag that isn't downloaded in that region yet is not a capacity problem:
+  retrying won't help until the tag shows `exists: true` (`gameye-troubleshoot`). Your
   allocator's backoff-and-fallback-region path (`gameye-matchmaking`) is the
   player-facing difference between "finding a server…" and an error screen. For a
   marketing-driven spike, tell Gameye in advance so regional capacity is warm.
