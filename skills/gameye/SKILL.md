@@ -7,7 +7,7 @@ metadata:
 
 # Gameye
 
-Pack version: 1.2.0
+Pack version: 1.3.0
 
 Gameye is managed dedicated game server hosting. The whole platform reduces to one
 interaction: you push a Docker image of your game server to your registry, and your

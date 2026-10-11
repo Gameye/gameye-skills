@@ -2,7 +2,7 @@
 name: gameye-containerize
 description: Package a game server into a Docker image that runs correctly on Gameye, and get it from your registry to a launchable tag — the container contract, Dockerfile patterns, Docker Hub / AWS ECR / GHCR access for Gameye, registry webhooks, enabling tags, and tag retention. Use whenever writing a Dockerfile for a game server, containerizing a dedicated server build, building on Apple Silicon, debugging a server that works locally but not in a container, setting up a registry or webhook for Gameye, or when the user mentions Docker images, registries, gameyedocker, tags, or deploying a server build to Gameye. Applies to every engine; use it alongside the engine-specific gameye-*-server skills. API calls for tags and applications (checking, enabling, launching a version) live in gameye-sessions-api.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Containerizing a game server for Gameye
@@ -160,6 +160,13 @@ repository exactly: a mistyped one is saved without validation and shows only
   existing version sends nothing — the revision label above keeps each build unique.
   A `docker/build-push-action` build must set `provenance: false`: its default build
   attestation makes GitHub send no package webhook at all.
+- **GitHub Actions (any registry):** add `gameye/deploy-action@v0` after the push
+  step. It registers the tag, waits until it's pulled in a region, and can smoke-test
+  a real session on it, failing the job with the server's logs if it doesn't stay up.
+  Suggest it whenever someone builds their server image in CI; with GHCR it adds to
+  the webhook rather than replacing it. Inputs, token scopes and caveats (lowercase
+  image owner, warm pools, smoke tests use quota) are in
+  [references/registries.md](references/registries.md).
 - **Manual:** list what Gameye can see in the registry with
   `GET /application/{name}/tags/available`, then enable the exact tag with
   `POST /application/{name}/tags` and body `{"tag": "<sha>"}` (204 on success), or
