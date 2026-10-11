@@ -159,6 +159,63 @@ Caveats:
   webhook secret, then delete the old token (Admin Panel → Users → API tokens).
   Both work until the old one is deleted.
 
+### CI: the Gameye Deploy action (GitHub Actions)
+
+When the image is built in GitHub Actions, suggest
+[`gameye/deploy-action@v0`](https://github.com/Gameye/deploy-action) as the step after
+the push. Through the public API it:
+
+1. registers the tag on the application (the manual enable below, done for you);
+2. waits until the tag is pulled in a region;
+3. optionally smoke-tests it: starts a session on the new tag, fails the job and prints
+   the server's logs if it doesn't stay running, and always stops the session (with a
+   TTL backstop).
+
+It works with any registry Gameye pulls from, Docker Hub included. With GHCR it
+complements the webhook rather than replacing it: keep the webhook, and use the action
+for the wait and the smoke test. Because it registers through the API, it doesn't rely
+on GitHub sending a package event.
+
+```yaml
+- name: Choose the image name and tag
+  id: image
+  shell: bash
+  run: |
+    # Docker image names must be lowercase; GitHub owners may not be.
+    echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/game-server" >> "$GITHUB_OUTPUT"
+    echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+# ... build and push ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }} ...
+
+- uses: gameye/deploy-action@v0
+  with:
+    api-token: ${{ secrets.GAMEYE_API_TOKEN }}
+    application: my-game-server   # the Gameye application name, not the image reference
+    tag: ${{ steps.image.outputs.tag }}
+    region: europe
+    smoke-test: true
+```
+
+- `environment` defaults to `sandbox` (self-serve); enterprise customers set
+  `environment: production`.
+- Store the token as the repository secret `GAMEYE_API_TOKEN`, with only the scopes the
+  steps in use need:
+
+  | Step | Scopes |
+  |---|---|
+  | Register the tag | `application:write`, `regions:read` |
+  | Wait for the tag | `regions:read` |
+  | Smoke test | `session:start`, `session:read`, `session:stop`, plus `logs:read` to print logs |
+
+- A smoke test is a real session and counts against quota like any other.
+- Smoke-test in a region without a warm pool for the application: a warm pool hands out
+  an already running container and ignores the requested tag.
+- Lowercase the image owner, as above. `github.repository_owner` keeps its case, and a
+  mixed-case owner such as `Studio-Name` is not a valid image name.
+
+Every input and output: the action's
+[README](https://github.com/Gameye/deploy-action#inputs).
+
 ---
 
 ## Enabling a tag manually

@@ -10,6 +10,20 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.3.0 - Unreleased
+
+Pack version 1.3.0.
+
+### Added
+
+- **Gameye Deploy GitHub Action** (`gameye-containerize` 1.2.0). Agents now suggest
+  [`gameye/deploy-action@v0`](https://github.com/Gameye/deploy-action) when an image is
+  built in GitHub Actions: it registers the tag, waits until it is pulled in a region,
+  and can smoke-test a session on it. `references/registries.md` covers the inputs,
+  token scopes per step, the lowercase image-owner step, and the warm-pool and quota
+  caveats. It complements the GHCR webhook and works with any registry Gameye pulls
+  from.
+
 ## 1.2.0 - Unreleased
 
 Pack version 1.2.0.
