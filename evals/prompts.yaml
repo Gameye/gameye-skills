@@ -334,3 +334,18 @@ entries:
       - A real launch
       - Shows the API token in the output
     notes: "The result itself starts with the environment and host, [sandbox · api.sandbox-gameye.gameye.net]."
+
+  # ---- troubleshoot --------------------------------------------------------
+  - id: troubleshoot-preloading-420
+    skill: gameye-troubleshoot
+    variant: both
+    prompt: "My new GHCR tag has been on Preloading for an hour and starting a session gives OUT_OF_COMPUTE. Gameye's servers must be full, right?"
+    expect:
+      - Says a 420 for a tag that isn't downloaded yet is not a capacity problem
+      - Checks the tag with the tag-exists endpoint or gameye_check_tag
+      - Walks through image path, public or private, gameyedocker Read on that package, and linux/amd64
+      - Suggests contacting Gameye support if every check passes
+    forbid:
+      - Tells the user to keep retrying the session start
+      - Starts a session before the tag shows exists true
+    notes: "From a real case where a private image was still on Docker Hub while the application pointed at GHCR."

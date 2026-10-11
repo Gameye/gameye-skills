@@ -321,6 +321,19 @@ overrides:
 
   - operation: session-run
     kind: behavior
+    spec_says: "Documents 420 without saying when it is returned."
+    fact: >-
+      The allocator only considers nodes in the region that already hold the
+      requested image and tag, so 420 is also returned when the tag is
+      registered but not yet downloaded on any node there, for example right
+      after registering it or while Gameye cannot pull it. An unknown
+      application, tag or region returns 404 instead.
+    evidence:
+      - {file: internal/orchestrator/scheduling/allocate.go, function: DefaultAllocator.discoverNodes}
+      - {file: internal/orchestrator/clientapi/run_session.go, function: RunSessionRoute.handleAllocationError}
+
+  - operation: session-run
+    kind: behavior
     spec_says: "`id` is \"the unique identifier of the session\"; the scope of uniqueness is unstated."
     fact: >-
       A custom `id` becomes the container name and must be unique across all of

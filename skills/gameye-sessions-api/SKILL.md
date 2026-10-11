@@ -2,7 +2,7 @@
 name: gameye-sessions-api
 description: The Gameye REST API for starting, listing, inspecting, and stopping game server sessions, plus player tracking, logs, artifacts, tokens and scopes, applications and tags, regions, and locations. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via the API, minting or scoping Gameye tokens, or when the user mentions starting game servers programmatically, session endpoints, api.sandbox-gameye.gameye.net, api.production-gameye.gameye.net, warm pools, or Gameye error codes. Registry and webhook setup is in gameye-containerize. Load it rather than guessing endpoint shapes — several requests and responses differ from what the published schema suggests.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Gameye sessions API
