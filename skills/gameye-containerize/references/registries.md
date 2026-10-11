@@ -213,8 +213,9 @@ on GitHub sending a package event.
 - Lowercase the image owner, as above. `github.repository_owner` keeps its case, and a
   mixed-case owner such as `Studio-Name` is not a valid image name.
 
-Every input and output: the action's
-[README](https://github.com/Gameye/deploy-action#inputs).
+Full guide: <https://gameye.com/docs/guides/using-gameye/github-actions/>. Every input
+and output: the action's [README](https://github.com/Gameye/deploy-action#inputs) (also
+listed on the [GitHub Marketplace](https://github.com/marketplace/actions/gameye-deploy)).
 
 ---
 

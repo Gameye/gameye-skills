@@ -23,6 +23,7 @@ Pack version 1.3.0.
   token scopes per step, the lowercase image-owner step, and the warm-pool and quota
   caveats. It complements the GHCR webhook and works with any registry Gameye pulls
   from.
+  Public guide: <https://gameye.com/docs/guides/using-gameye/github-actions/>.
 
 ## 1.2.0 - Unreleased
 
