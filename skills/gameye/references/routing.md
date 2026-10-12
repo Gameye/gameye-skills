@@ -77,4 +77,6 @@ The MCP tools map one-to-one onto API operations; the `MCP tool` column of the
 `gameye-sessions-api` reference lists them. `gameye_context` reports the
 environment, host and server version; call it first when you are unsure which
 environment the server is pointed at. Application create/edit and token creation
-register only when the server runs with `GAMEYE_ENABLE_ADMIN_TOOLS=1`.
+are always available; the token's scopes (`application:write`, `token:write`)
+decide whether they succeed. `gameye_update_skills` is the one tool that isn't an
+API operation: it checks and updates these skills.
