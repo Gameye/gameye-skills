@@ -72,6 +72,13 @@ To see what's available without installing anything:
 npx skills add gameye/gameye-skills --list
 ```
 
+**On Windows**, run these in Command Prompt, or type `npx.cmd` instead of `npx` in
+PowerShell. On a new Windows install, PowerShell refuses to run `npx` with "running
+scripts is disabled on this system", because Node installs it as a PowerShell script.
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` also fixes that. The skills CLI copies
+the skills on Windows instead of linking them. Windows testing is behind macOS and Linux,
+so please open an issue if something breaks.
+
 ### As a Claude Code plugin (skills + MCP server)
 
 This repository is also a Claude Code plugin marketplace. In a Claude Code session:
@@ -116,6 +123,9 @@ npx -y gameye-mcp
 # Claude Code without the plugin:
 claude mcp add gameye -e GAMEYE_API_TOKEN="$GAMEYE_API_TOKEN" -- npx -y gameye-mcp@0
 ```
+
+On Windows, start it through `cmd /c` (`-- cmd /c npx -y gameye-mcp@0`); the
+[gameye-mcp README](https://github.com/gameye/gameye-mcp#windows) has the details.
 
 Avoid putting the token literally on the command line (`GAMEYE_API_TOKEN=<token> ...`):
 it stays in your shell history.
