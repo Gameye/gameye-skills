@@ -162,8 +162,6 @@ def client_row(spec: dict, op_id: str, entry: dict, overrides: list[dict], tool:
     for override in overrides:
         if override["kind"] != "scope":
             notes.append(override["fact"])
-    if tool and tool.get("admin_gated"):
-        notes.append("Admin-gated: needs an admin-level scope; the MCP tool is opt-in.")
 
     tool_name = f"`{tool['tool']}`" if tool else "none"
     cells = [f"`{op_id}`", f"`{entry['method']} {entry['path']}`", scope, tool_name]

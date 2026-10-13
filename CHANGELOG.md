@@ -10,6 +10,21 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.5.0 - Unreleased
+
+Pack version 1.5.0.
+
+### Changed
+
+- **`gameye`** (1.1.0). New "Keeping these skills current" section: with the Gameye MCP
+  server, the agent runs `gameye_update_skills` once per conversation and asks before
+  updating. `GAMEYE_ENABLE_ADMIN_TOOLS` is gone from the MCP server table: since
+  `gameye-mcp` 0.2.0 the application and token tools are always registered, and the
+  token's scopes decide what they can do. `references/routing.md` says the same.
+- **`gameye-sessions-api`** (1.0.2). The API reference no longer marks
+  `create-token`, `create-application` and `edit-application` as admin-gated opt-in
+  tools.
+
 ## 1.4.0 - Unreleased
 
 Pack version 1.4.0.

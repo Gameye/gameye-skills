@@ -16,9 +16,7 @@ covers one or two prompts per skill plus seven guardrail scenarios (G1 to G7).
    claude mcp add gameye --env GAMEYE_API_TOKEN=<eval-token> -- npx -y gameye-mcp
    ```
 
-   Leave `GAMEYE_ENV` unset (it defaults to sandbox) and leave
-   `GAMEYE_ENABLE_ADMIN_TOOLS` unset, except when you deliberately test the admin
-   path.
+   Leave `GAMEYE_ENV` unset (it defaults to sandbox).
 3. Use a **sandbox org that is not a live self-serve game**. Sandbox is where self-serve
    customers run real matches, so evals must never share an org with live sessions.
    Use an Operator-scope token (see the MCP README) that exists only for evals, with

@@ -141,6 +141,10 @@ without waiting for a release.
   you ask it to. To turn auto-update on, open `/plugin`, go to **Marketplaces**, select
   `gameye`, and choose **Enable auto-update**. Or update by hand with
   `/plugin marketplace update gameye`.
+- **With the Gameye MCP server:** `gameye_update_skills` checks your installs (skills
+  CLI, user-wide or project, and the Claude Code plugin) against the latest pack, and
+  updates them through the same tools when you agree. The `gameye` skill asks your
+  agent to run the check once per conversation.
 - **Manual copies:** copy the directories again.
 
 Each release is listed in [CHANGELOG.md](CHANGELOG.md). The `gameye` skill states its pack

@@ -19,8 +19,7 @@
 #   scope       (scope) the scope the handler checks
 #   evidence    list of {file, function} in core `dev`
 
-# MCP tool names (gameye-mcp), keyed by operationId. admin_gated marks tools
-# that need an admin-level scope and should sit behind an explicit opt-in.
+# MCP tool names (gameye-mcp), keyed by operationId.
 tools:
   session-run: {tool: gameye_launch_session}
   session-list: {tool: gameye_list_sessions}
@@ -30,10 +29,10 @@ tools:
   leave-session: {tool: gameye_player_leave}
   artifacts: {tool: gameye_get_artifacts}
   stream-logs: {tool: gameye_get_logs}
-  create-token: {tool: gameye_create_token, admin_gated: true}
+  create-token: {tool: gameye_create_token}
   list-applications: {tool: gameye_list_applications}
-  create-application: {tool: gameye_create_application, admin_gated: true}
-  edit-application: {tool: gameye_edit_application, admin_gated: true}
+  create-application: {tool: gameye_create_application}
+  edit-application: {tool: gameye_edit_application}
   enable-tag: {tool: gameye_enable_tag}
   list-application-tags-upstream: {tool: gameye_list_registry_tags}
   list-regions: {tool: gameye_list_regions}
