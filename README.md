@@ -33,7 +33,8 @@ server differs from it.
 ┣ 📁 Shipping
 ┃ ┣ 📄 gameye-containerize  · · · the container contract, registries, webhooks
 ┃ ┣ 📄 gameye-local-testing · · · parity testing before you deploy
-┃ ┗ 📄 gameye-launch  · · · · · · production checklist + operations
+┃ ┣ 📄 gameye-launch  · · · · · · production checklist + operations
+┃ ┗ 📄 gameye-troubleshoot  · · · deploys that won't load or start
 ┃
 ┗ 📁 Orchestration
   ┣ 📄 gameye-sessions-api  · · · the full REST API, server-verified
@@ -42,7 +43,7 @@ server differs from it.
 
 ## Install
 
-Pick one of these. They all install the same eleven skills from `skills/`.
+Pick one of these. They all install the same twelve skills from `skills/`.
 
 ### With the `skills` CLI (any agent)
 
@@ -80,7 +81,7 @@ This repository is also a Claude Code plugin marketplace. In a Claude Code sessi
 /plugin install gameye@gameye
 ```
 
-The plugin installs all eleven skills and the [Gameye MCP server](#gameye-mcp-server).
+The plugin installs all twelve skills and the [Gameye MCP server](#gameye-mcp-server).
 When you enable it, Claude Code asks for two settings:
 
 | Setting | What to enter |
