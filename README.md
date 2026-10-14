@@ -76,8 +76,9 @@ npx skills add gameye/gameye-skills --list
 PowerShell. On a new Windows install, PowerShell refuses to run `npx` with "running
 scripts is disabled on this system", because Node installs it as a PowerShell script.
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` also fixes that. The skills CLI copies
-the skills on Windows instead of linking them. Windows testing is behind macOS and Linux,
-so please open an issue if something breaks.
+the skills on Windows instead of linking them. We've tested the skills CLI, the Claude Code
+plugin and the MCP server on Windows 11 with Node.js 22. If something breaks on Windows,
+please open an issue.
 
 ### As a Claude Code plugin (skills + MCP server)
 
