@@ -1,5 +1,7 @@
 # Gameye Agent Skills
 
+[![Discord](https://img.shields.io/badge/Discord-join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/QvJ3KH5max)
+
 **Teach your coding agent to ship multiplayer.**
 
 [Agent Skills](https://agentskills.io) that give Claude Code, Cursor, Copilot, and any
