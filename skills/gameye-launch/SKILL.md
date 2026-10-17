@@ -2,7 +2,7 @@
 name: gameye-launch
 description: Take a Gameye-hosted game from "the smoke test passes" to live players — the launch checklist, the right API host for the customer's tier, token hygiene and scopes, tag and rollout strategy, TTL and cost control, capacity and quota behavior, observability, and incident basics. Use when preparing a launch or playtest on Gameye, reviewing production readiness, or when the user mentions going live, launch day, rollout, or operating game servers with real players.
 metadata:
-  version: "1.0.1"
+  version: "1.0.2"
 ---
 
 # Launching and operating on Gameye
@@ -45,6 +45,9 @@ the user's backend always calls HTTP.
   `gameye-local-testing`) plus margin — it's guaranteed *and* billed; both
   undersizing and oversizing are real costs, one in player experience, one in money.
 - Regions enabled where your players are; confirm via `GET /available-location/{image}`.
+  After adding a region, wait for both the tag (`GET /tag/{region}/{image}/{version}`)
+  and `/available-location` to list it before routing players there: the location
+  list can trail the tag by minutes.
 - "Tags to keep" understood: current + previous stay warm; older tags rotate out.
 
 **Rollout mechanics**

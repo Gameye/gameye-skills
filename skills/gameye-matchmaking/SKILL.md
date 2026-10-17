@@ -2,7 +2,7 @@
 name: gameye-matchmaking
 description: Wire matchmaking to Gameye so a formed match reliably becomes a running server with connected players — allocator patterns, idempotent session creation, latency-based region selection, backfill, and the Nakama/Pragma/Photon Fusion/Unity Matchmaker integrations. Use whenever building a matchmaker or allocator, connecting an existing matchmaking service to dedicated servers, or when the user asks how players get into a match, how to pick a region, how to backfill sessions, or how to handle allocation failures.
 metadata:
-  version: "1.0.1"
+  version: "1.1.0"
 ---
 
 # Matchmaking on top of Gameye sessions
@@ -82,12 +82,40 @@ believes are live. Orphans get stopped; TTL is the backstop beneath that. (A
 
 - **Static** — player base concentrated in one geography: pin the region, revisit
   quarterly.
-- **Latency-based** — clients ping the ping IPs (once per queue entry, cached),
-  submit latencies with their ticket; the matchmaker groups compatible players and
-  the allocator picks the region minimizing the group's worst latency (p95, not
-  mean — the worst-connected player defines match quality).
+- **Latency-based** — native clients ping the ping IPs (once per queue entry,
+  cached), submit latencies with their ticket; the matchmaker groups compatible
+  players and the allocator picks the region minimizing the group's worst latency
+  (p95, not mean — the worst-connected player defines match quality).
 
 Fetch the region list rather than hardcoding; availability evolves.
+
+**Browser clients can't ping.** The ping IPs answer ICMP, and a web page can't send
+ICMP. Estimate from location instead:
+
+- Get the player's coordinates server side, never from the page. A CDN edge sees
+  them for free (Cloudflare Workers: `request.cf.latitude` / `longitude`). Have the
+  edge or your backend sign them into a short-lived token (about 10 minutes) and
+  verify it in the allocator, so a player can't pull a match to their region with
+  made-up numbers.
+- Keep a table of where each enabled region's servers actually are, and turn
+  great-circle distance into an estimated round trip. A linear fit such as
+  `km / 86 + 33` ms was within 16 ms of real pings to three regions; calibrate yours
+  against `ping` to the ping IPs from a few vantage points. Only the order between
+  regions decides a match, not the exact number.
+- A player with no valid location reports nothing, and the match falls back to
+  your default region.
+
+**Match within a region.** Put the player's region on the ticket and in the query
+(Nakama: a `region` string property and `+properties.region:<id>`), so players are
+only grouped with players in the same region. This thins queues: plan for bots or a
+wider search after a timeout.
+
+**Let players pick a region.** With only automatic placement, a player can never
+join friends whose nearest region is another one. Offer "Auto (nearest)" plus each
+enabled region, and queue a picked region under the same region term so pickers and
+locals meet. When any matched player picked, start the session in that region
+explicitly: a latency rule can choose a different one (one far player plus two near
+ones can make a third region the lowest worst case), and a pick must win.
 
 ## Backfill
 
@@ -111,7 +139,7 @@ player-tracking endpoints aren't optional bookkeeping, they're what makes
 
 | Matchmaker | How it meets Gameye | Allocator role |
 |---|---|---|
-| Nakama (Heroic Labs) | Nakama's match lifecycle can drive Gameye session management | Your Nakama match handler calls `POST /session` |
+| Nakama (Heroic Labs) | The Gameye Fleet Manager for Nakama ([`github.com/Gameye/nakama-fleetmanager`](https://github.com/Gameye/nakama-fleetmanager), v0.2.0+) is a Go plugin that implements Nakama's fleet manager on the Sessions API | Your matchmaker-matched hook calls `fm.Create`; pass each user's per-region latencies and it picks the lowest worst-case region, or set `metadata["gameye.region"]` to force one. [Scrapyard on Gameye](https://github.com/Gameye/scrapyard-nakama) is a working multi-region reference |
 | Pragma (Pragma Engine) | Game backend whose matchmaking can request Gameye sessions when a match forms | Handled by Pragma Engine; little developer-side glue |
 | Photon Fusion | Fusion dedicated-server builds can run as Gameye sessions | Fusion's session management pairs with the allocation flow above |
 | Unity Matchmaker (UGS) | A Cloud Code module acts as the allocator when a match is formed | Your Cloud Code module calls `POST /session` from the server side and returns the address |
