@@ -2,7 +2,7 @@
 name: gameye-web-server
 description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and the Dockerfile variant for Node servers. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Web game servers on Gameye
@@ -117,12 +117,28 @@ Every browser game must pick one of:
    image (registries are not secret stores) and never pass it in session `env`, which
    any `session:read` token in your organization can read. Renew the certificate on
    your backend; servers pick up the new key on their next boot.
-2. **Non-browser packaging** — Electron/Tauri/mobile wrappers aren't subject to
+2. **A WebSocket relay at the edge.** The page opens `wss://relay.yourgame.example/match?token=…`
+   to a small relay (for example a Cloudflare Worker) that holds TLS, and the relay
+   opens `ws://` to the session. No DNS records per session and no certificate on the
+   game server. The load-bearing details:
+   - Your backend mints a short-lived relay token naming the session's host and port
+     (HMAC-signed, a few minutes' expiry), and the relay connects only to the address
+     in a valid token. A relay that takes the target from the URL is an open proxy.
+   - The relay accepts only your page's `Origin` (403 otherwise). Test clients must
+     send that `Origin` header too.
+   - Cloudflare Workers' `fetch` refuses bare-IP hosts. Turn the session IP into a
+     hostname with wildcard DNS (`203.0.113.7.sslip.io`, or your own zone).
+   - The relay-to-server hop is unencrypted, and every frame takes one extra hop.
+     Keep join authentication on the game server as well.
+
+   [Scrapyard on Gameye](https://github.com/Gameye/scrapyard-nakama) runs this
+   pattern in production across three continents (`edge/worker.js`).
+3. **Non-browser packaging** — Electron/Tauri/mobile wrappers aren't subject to
    mixed-content rules and may use `ws://ip:port` directly.
-3. **Plain-HTTP page** during development only. Fine on `http://localhost`, not
+4. **Plain-HTTP page** during development only. Fine on `http://localhost`, not
    shippable.
 
-Build the join flow around option 1 unless the game will never ship in a browser.
+Build the join flow around option 1 or 2 unless the game will never ship in a browser.
 
 ## Container specifics
 

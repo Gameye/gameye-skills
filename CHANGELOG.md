@@ -10,6 +10,23 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.6.0 - Unreleased
+
+Pack version 1.6.0. Lessons from building [Scrapyard on Gameye](https://github.com/Gameye/scrapyard-nakama),
+a multi-region browser game.
+
+### Changed
+
+- **`gameye-matchmaking`** (1.1.0). Region selection no longer assumes every client
+  can ping: browser clients can't send ICMP, so the skill now describes estimating
+  latency from a signed, server-side location, matching within a region, and a region
+  picker whose choice is forced at session start. The Nakama row names the Gameye Fleet
+  Manager for Nakama (v0.2.0+: latency-based placement and the `gameye.region` override).
+- **`gameye-web-server`** (1.2.0). New TLS option: a WebSocket relay at the edge, with
+  signed relay tokens, an `Origin` check, and the Cloudflare Workers bare-IP limit.
+- **`gameye-launch`** (1.0.2). After adding a region, wait for `/available-location`
+  as well as the tag, since the location list can trail it by minutes.
+
 ## 1.5.0 - Unreleased
 
 Pack version 1.5.0.
