@@ -10,6 +10,20 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.6.1 - Unreleased
+
+Pack version 1.6.1.
+
+### Fixed
+
+- **`gameye-matchmaking`** (1.1.1) and **`gameye-sessions-api`** (1.0.3). A `420` for
+  a tag that isn't downloaded in the region yet (`exists: false`) is no longer treated
+  as busy capacity: wait for the download instead of moving the match to another
+  region. Only a `420` for a tag that shows `exists: true` falls back to the next
+  region. This matches `gameye-troubleshoot`.
+- **Evals setup.** The MCP install line now passes `GAMEYE_API_TOKEN` from an exported
+  variable instead of a literal token, and pins `gameye-mcp@0`.
+
 ## 1.6.0 - Unreleased
 
 Pack version 1.6.0. Lessons from building [Scrapyard on Gameye](https://github.com/Gameye/scrapyard-nakama),
@@ -26,16 +40,6 @@ a multi-region browser game.
   signed relay tokens, an `Origin` check, and the Cloudflare Workers bare-IP limit.
 - **`gameye-launch`** (1.0.2). After adding a region, wait for `/available-location`
   as well as the tag, since the location list can trail it by minutes.
-
-### Fixed
-
-- **`gameye-matchmaking`** (1.1.1) and **`gameye-sessions-api`** (1.0.3). A `420` for
-  a tag that isn't downloaded in the region yet (`exists: false`) is no longer treated
-  as busy capacity: wait for the download instead of moving the match to another
-  region. Only a `420` for a tag that shows `exists: true` falls back to the next
-  region. This matches `gameye-troubleshoot`.
-- **Evals setup.** The MCP install line now passes `GAMEYE_API_TOKEN` from an exported
-  variable instead of a literal token, and pins `gameye-mcp@0`.
 
 ## 1.5.0 - Unreleased
 
