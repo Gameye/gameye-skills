@@ -10,7 +10,10 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
-## 1.6.1 - Unreleased
+From 1.6.1, each release is also a git tag (`v1.6.1`) with a GitHub release, so you can
+pin a known version. Earlier versions shipped on `main` without a tag.
+
+## 1.6.1 - 2026-10-24
 
 Pack version 1.6.1.
 
@@ -24,7 +27,7 @@ Pack version 1.6.1.
 - **Evals setup.** The MCP install line now passes `GAMEYE_API_TOKEN` from an exported
   variable instead of a literal token, and pins `gameye-mcp@0`.
 
-## 1.6.0 - Unreleased
+## 1.6.0
 
 Pack version 1.6.0. Lessons from building [Scrapyard on Gameye](https://github.com/Gameye/scrapyard-nakama),
 a multi-region browser game.
@@ -41,7 +44,7 @@ a multi-region browser game.
 - **`gameye-launch`** (1.0.2). After adding a region, wait for `/available-location`
   as well as the tag, since the location list can trail it by minutes.
 
-## 1.5.0 - Unreleased
+## 1.5.0
 
 Pack version 1.5.0.
 
@@ -56,7 +59,7 @@ Pack version 1.5.0.
   `create-token`, `create-application` and `edit-application` as admin-gated opt-in
   tools.
 
-## 1.4.0 - Unreleased
+## 1.4.0
 
 Pack version 1.4.0.
 
@@ -78,7 +81,7 @@ Pack version 1.4.0.
 - **`gameye`** (1.0.3). The task table routes "why won't it load or start" to
   `gameye-troubleshoot`.
 
-## 1.3.0 - Unreleased
+## 1.3.0
 
 Pack version 1.3.0.
 
@@ -93,7 +96,7 @@ Pack version 1.3.0.
   from.
   Public guide: <https://gameye.com/docs/guides/using-gameye/github-actions/>.
 
-## 1.2.0 - Unreleased
+## 1.2.0
 
 Pack version 1.2.0.
 
@@ -106,7 +109,7 @@ Pack version 1.2.0.
   Rapier or cannon-es, and keeping the client out of the server image. A new eval prompt
   checks it.
 
-## 1.1.0 - Unreleased
+## 1.1.0
 
 Pack version 1.1.0; `gameye-containerize` 1.1.0, `gameye` 1.0.2.
 
@@ -121,7 +124,7 @@ Pack version 1.1.0; `gameye-containerize` 1.1.0, `gameye` 1.0.2.
   shown on the application page in the Admin Panel. Enterprise production does not have
   GHCR yet.
 
-## 1.0.1 - Unreleased
+## 1.0.1
 
 First public release. Pack version 1.0.1; `gameye` and `gameye-matchmaking` are at
 `metadata.version` 1.0.1 and the other nine skills are at 1.0.0.
