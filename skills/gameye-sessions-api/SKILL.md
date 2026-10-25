@@ -341,7 +341,7 @@ Error bodies:
 | 403 | Token lacks the scope, or a token request asks for scopes the caller doesn't hold | Use a token with the scope in the reference |
 | 404 | Session, application, image or tag not found, or not yours | For start: check `version` is enabled in that region. For artifacts: session may not be `exited` yet |
 | 409 | Duplicate session ID (IDs are unique across all of Gameye), or session already terminated | Start: describe that ID. Found → an earlier attempt of yours started it; continue. `404` → another organization owns the ID; retry with a fresh one. Stop: treat as done |
-| 420 | No compute available in the region, or the tag isn't downloaded there yet | Check `GET /tag/{region}/{image}/{version}`. `exists: false` → wait until it's `true` (another region won't help; see `gameye-troubleshoot`). `exists: true` → back off and retry, or offer the next-best region |
+| 420 | No compute available in the region, or the tag isn't downloaded there yet | Check `GET /tag/{region}/{image}/{version}`. `exists: false` → retrying this region won't help until the download finishes; use a region where it's `true`, or wait (`gameye-troubleshoot`). `exists: true` → back off and retry, or offer the next-best region |
 | 422 | Validation failed | Read `violations` for field-level messages |
 | 429 | Organization quota exceeded (`X-Quota-Type`, `X-Quota-Limit` headers) | Don't hot-retry; stop idle sessions or ask Gameye to raise the quota |
 | 5xx | Gameye-side fault | Retry with backoff; record the `identifier` and include it when contacting support. Exception: a `500` from `POST /token` may be a duplicate `name` — retry only with a new name |

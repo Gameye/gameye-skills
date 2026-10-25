@@ -18,9 +18,9 @@ Pack version 1.6.1.
 
 - **`gameye-matchmaking`** (1.1.1) and **`gameye-sessions-api`** (1.0.3). A `420` for
   a tag that isn't downloaded in the region yet (`exists: false`) is no longer treated
-  as busy capacity: wait for the download instead of moving the match to another
-  region. Only a `420` for a tag that shows `exists: true` falls back to the next
-  region. This matches `gameye-troubleshoot`.
+  as busy capacity: retrying that region won't help, so skip to a region where the
+  tag shows `exists: true`, or wait if none does. A `420` for a downloaded tag still
+  means busy: back off, then fall back. This matches `gameye-troubleshoot`.
 - **Evals setup.** The MCP install line now passes `GAMEYE_API_TOKEN` from an exported
   variable instead of a literal token, and pins `gameye-mcp@0`.
 

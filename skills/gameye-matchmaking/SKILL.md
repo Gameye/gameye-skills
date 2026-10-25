@@ -58,10 +58,12 @@ session on a server that already holds the image, so `420` also comes back for a
 that isn't downloaded in that region yet: right after you register it, or while
 Gameye can't pull it. Check `GET /tag/{region}/{image}/{version}`:
 
-- **`exists: false`**: not a capacity problem. Another region won't help, since a new
-  tag downloads everywhere at about the same time. Keep matching on the previous tag
-  until the new one shows `exists: true` in every region you serve, and see
-  `gameye-troubleshoot` if it stays `false` for more than about 10 minutes.
+- **`exists: false`**: not a capacity problem, so retrying that region won't help
+  until the download finishes. Skip to the next region that shows `exists: true` for
+  the tag; if none does, the match has to wait (or run on a tag that is already
+  downloaded). Regions can finish downloading at different times, so check each one
+  rather than assuming. See `gameye-troubleshoot` if a region stays `false` for
+  more than about 10 minutes.
 - **`exists: true`**: the region is busy. Back off briefly and retry, then fall back
   to the group's second-best region. Surface "high demand, finding you a server…" to
   players rather than failing the ticket.
@@ -185,10 +187,10 @@ async function allocate(match: Match): Promise<{ connect: string }> {
         continue;                                          // same region, fresh id
       }
       if (e.status === 420) {
-        // GET /tag/{region}/{image}/{version}. Not downloaded here yet is not
-        // capacity: don't spread to other regions, keep matching on the old tag
-        if (!(await tagExists(locs[i], IMAGE, PINNED_TAG))) throw new TagNotReadyError(PINNED_TAG);
-        await backoff(); i++; continue;                    // region busy: next region
+        // GET /tag/{region}/{image}/{version}: not downloaded here yet is not
+        // capacity, so skip without backoff; busy regions get a backoff first
+        if (await tagExists(locs[i], IMAGE, PINNED_TAG)) await backoff();
+        i++; continue;                                     // next region
       }
       throw e;                          // 402/429 quota, real failures: log identifier
     }
