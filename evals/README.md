@@ -10,10 +10,11 @@ covers one or two prompts per skill plus seven guardrail scenarios (G1 to G7).
 1. Start a fresh agent session (no prior context) with the skills installed, for
    example `npx skills add gameye/gameye-skills` or the Claude Code plugin.
 2. For `with-mcp` runs, also add the MCP server, pointed at **sandbox** with a
-   dedicated low-scope token:
+   dedicated low-scope token. Export the token from your secret manager first, so it
+   never appears literally on the command line or in your shell history:
 
    ```bash
-   claude mcp add gameye --env GAMEYE_API_TOKEN=<eval-token> -- npx -y gameye-mcp
+   claude mcp add gameye -e GAMEYE_API_TOKEN="$GAMEYE_API_TOKEN" -- npx -y gameye-mcp@0
    ```
 
    Leave `GAMEYE_ENV` unset (it defaults to sandbox).

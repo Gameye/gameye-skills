@@ -2,7 +2,7 @@
 name: gameye-matchmaking
 description: Wire matchmaking to Gameye so a formed match reliably becomes a running server with connected players — allocator patterns, idempotent session creation, latency-based region selection, backfill, and the Nakama/Pragma/Photon Fusion/Unity Matchmaker integrations. Use whenever building a matchmaker or allocator, connecting an existing matchmaking service to dedicated servers, or when the user asks how players get into a match, how to pick a region, how to backfill sessions, or how to handle allocation failures.
 metadata:
-  version: "1.1.0"
+  version: "1.1.1"
 ---
 
 # Matchmaking on top of Gameye sessions
@@ -53,10 +53,18 @@ backend at boot, keyed by the session ID your backend got back from `POST /sessi
 **Always set a TTL.** Max expected match length plus margin. An allocator bug or an
 abandoned lobby then costs minutes, not a weekend.
 
-**Handle `420` as a real outcome.** It means no compute available in that region
-right now. Back off briefly and retry, then fall back to the group's second-best
-region. Surface "high demand, finding you a server…" to players rather than failing
-the ticket.
+**Handle `420` as a real outcome, but first check the tag.** Gameye only places a
+session on a server that already holds the image, so `420` also comes back for a tag
+that isn't downloaded in that region yet: right after you register it, or while
+Gameye can't pull it. Check `GET /tag/{region}/{image}/{version}`:
+
+- **`exists: false`**: not a capacity problem. Another region won't help, since a new
+  tag downloads everywhere at about the same time. Keep matching on the previous tag
+  until the new one shows `exists: true` in every region you serve, and see
+  `gameye-troubleshoot` if it stays `false` for more than about 10 minutes.
+- **`exists: true`**: the region is busy. Back off briefly and retry, then fall back
+  to the group's second-best region. Surface "high demand, finding you a server…" to
+  players rather than failing the ticket.
 
 **`429` and `402` are not capacity.** `429` means your organization's quota is
 exceeded (`X-Quota-Type`, `X-Quota-Limit` headers); `402` means a trial quota is
@@ -176,7 +184,12 @@ async function allocate(match: Match): Promise<{ connect: string }> {
         sessionId = `my-game-${crypto.randomUUID()}`;     // 404: another org owns it
         continue;                                          // same region, fresh id
       }
-      if (e.status === 420) { await backoff(); i++; continue; } // no compute: next region
+      if (e.status === 420) {
+        // GET /tag/{region}/{image}/{version}. Not downloaded here yet is not
+        // capacity: don't spread to other regions, keep matching on the old tag
+        if (!(await tagExists(locs[i], IMAGE, PINNED_TAG))) throw new TagNotReadyError(PINNED_TAG);
+        await backoff(); i++; continue;                    // region busy: next region
+      }
       throw e;                          // 402/429 quota, real failures: log identifier
     }
   }
