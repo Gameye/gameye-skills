@@ -10,6 +10,20 @@ Each release has a **pack version**: the `Pack version:` line in
 `npx skills update` or Claude Code plugin updates, so you get fixes without waiting for a
 release. The versions here tell you what changed and whether your copy is current.
 
+## 1.6.1 - Unreleased
+
+Pack version 1.6.1.
+
+### Fixed
+
+- **`gameye-matchmaking`** (1.1.1) and **`gameye-sessions-api`** (1.0.3). A `420` for
+  a tag that isn't downloaded in the region yet (`exists: false`) is no longer treated
+  as busy capacity: retrying that region won't help, so skip to a region where the
+  tag shows `exists: true`, or wait if none does. A `420` for a downloaded tag still
+  means busy: back off, then fall back. This matches `gameye-troubleshoot`.
+- **Evals setup.** The MCP install line now passes `GAMEYE_API_TOKEN` from an exported
+  variable instead of a literal token, and pins `gameye-mcp@0`.
+
 ## 1.6.0 - Unreleased
 
 Pack version 1.6.0. Lessons from building [Scrapyard on Gameye](https://github.com/Gameye/scrapyard-nakama),

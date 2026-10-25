@@ -2,7 +2,7 @@
 name: gameye-sessions-api
 description: The Gameye REST API for starting, listing, inspecting, and stopping game server sessions, plus player tracking, logs, artifacts, tokens and scopes, applications and tags, regions, and locations. Use whenever writing code that calls the Gameye API, wiring a backend or matchmaker to Gameye, debugging a session via the API, minting or scoping Gameye tokens, or when the user mentions starting game servers programmatically, session endpoints, api.sandbox-gameye.gameye.net, api.production-gameye.gameye.net, warm pools, or Gameye error codes. Registry and webhook setup is in gameye-containerize. Load it rather than guessing endpoint shapes — several requests and responses differ from what the published schema suggests.
 metadata:
-  version: "1.0.2"
+  version: "1.0.3"
 ---
 
 # Gameye sessions API
@@ -341,7 +341,7 @@ Error bodies:
 | 403 | Token lacks the scope, or a token request asks for scopes the caller doesn't hold | Use a token with the scope in the reference |
 | 404 | Session, application, image or tag not found, or not yours | For start: check `version` is enabled in that region. For artifacts: session may not be `exited` yet |
 | 409 | Duplicate session ID (IDs are unique across all of Gameye), or session already terminated | Start: describe that ID. Found → an earlier attempt of yours started it; continue. `404` → another organization owns the ID; retry with a fresh one. Stop: treat as done |
-| 420 | No compute available in the region right now | Back off and retry, or offer the next-best region |
+| 420 | No compute available in the region, or the tag isn't downloaded there yet | Check `GET /tag/{region}/{image}/{version}`. `exists: false` → retrying this region won't help until the download finishes; use a region where it's `true`, or wait (`gameye-troubleshoot`). `exists: true` → back off and retry, or offer the next-best region |
 | 422 | Validation failed | Read `violations` for field-level messages |
 | 429 | Organization quota exceeded (`X-Quota-Type`, `X-Quota-Limit` headers) | Don't hot-retry; stop idle sessions or ask Gameye to raise the quota |
 | 5xx | Gameye-side fault | Retry with backoff; record the `identifier` and include it when contacting support. Exception: a `500` from `POST /token` may be a duplicate `name` — retry only with a new name |
@@ -409,7 +409,7 @@ export async function logSnapshot(sessionId: string) {
 }
 ```
 
-Handle 420 and 5xx with bounded retries (same `id`), 402 and 429 by surfacing the
+Handle 420 (once the tag shows `exists: true`) and 5xx with bounded retries (same `id`), 402 and 429 by surfacing the
 problem instead of retrying, and stop sessions you no longer need. For allocator
 patterns, backfill, and region selection built on these calls, load
 `gameye-matchmaking`.
