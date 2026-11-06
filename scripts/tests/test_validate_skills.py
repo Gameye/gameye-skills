@@ -609,3 +609,123 @@ def test_pack_version_only_edit_is_not_a_change(repo: Path) -> None:
 def test_metadata_version_only_bump_is_not_a_change(repo: Path) -> None:
     bump_skill(repo, "gameye-sessions-api", "1.0.1")
     assert versioning_errors(repo) == []
+
+
+# ---------------------------------------------------------- template markers
+
+DOCKER_FENCE = "```dockerfile\nFROM debian:bookworm-slim\nENTRYPOINT [\"/server/game\"]\n```"
+HOOK_FENCE = "```gdscript\nfunc shutdown() -> void:\n    get_tree().quit(0)\n```"
+
+
+def marked(engine: str, kind: str, inner: str) -> str:
+    return f"<!-- gameye-template: {engine}/{kind} -->\n{inner}\n<!-- /gameye-template -->"
+
+
+def engine_body(engine: str = "godot", docker: str | None = None, hook: str | None = None) -> str:
+    docker = marked(engine, "dockerfile", DOCKER_FENCE) if docker is None else docker
+    hook = marked(engine, "shutdown-hook", HOOK_FENCE) if hook is None else hook
+    return f"# Engine\n\n## Shutdown\n\n{hook}\n\n## Container specifics\n\n{docker}\n"
+
+
+def add_engine(root: Path, body: str, engine: str = "godot") -> None:
+    add_skill_body(root, body, name=f"gameye-{engine}-server")
+
+
+def template_errors(root: Path) -> list[str]:
+    return [e for e in run(root) if e.startswith("template:")]
+
+
+def test_engine_with_both_marker_pairs_passes(tree: Path) -> None:
+    add_engine(tree, engine_body())
+    assert run(tree) == []
+
+
+def test_prose_inside_marker_pair_is_allowed(tree: Path) -> None:
+    hook = marked("godot", "shutdown-hook", f"Written against Godot 4.7.2.\n\n{HOOK_FENCE}")
+    add_engine(tree, engine_body(hook=hook))
+    assert template_errors(tree) == []
+
+
+def test_missing_marker_pair_fails(tree: Path) -> None:
+    add_engine(tree, engine_body(hook=HOOK_FENCE))
+    errors = template_errors(tree)
+    assert any("skills/gameye-godot-server/SKILL.md" in e and "missing" in e and "godot/shutdown-hook" in e
+               for e in errors), errors
+
+
+def test_duplicate_marker_pair_fails(tree: Path) -> None:
+    body = engine_body() + "\n" + marked("godot", "dockerfile", DOCKER_FENCE) + "\n"
+    add_engine(tree, body)
+    assert any("duplicate" in e and "godot/dockerfile" in e for e in template_errors(tree))
+
+
+def test_unclosed_marker_fails(tree: Path) -> None:
+    add_engine(tree, engine_body(docker=f"<!-- gameye-template: godot/dockerfile -->\n{DOCKER_FENCE}"))
+    assert any("never closed" in e and "godot/dockerfile" in e for e in template_errors(tree))
+
+
+def test_close_without_open_fails(tree: Path) -> None:
+    add_engine(tree, engine_body() + "\n<!-- /gameye-template -->\n")
+    assert any("without an opening marker" in e for e in template_errors(tree))
+
+
+def test_nested_open_fails(tree: Path) -> None:
+    hook = ("<!-- gameye-template: godot/shutdown-hook -->\n"
+            + marked("godot", "dockerfile", DOCKER_FENCE) + f"\n{HOOK_FENCE}\n<!-- /gameye-template -->")
+    add_engine(tree, engine_body(docker="", hook=hook))
+    assert any("still open" in e for e in template_errors(tree))
+
+
+@pytest.mark.parametrize("inner, count", [
+    ("No code here.", 0),
+    (f"{HOOK_FENCE}\n\n{HOOK_FENCE}", 2),
+])
+def test_marker_must_wrap_exactly_one_fence(tree: Path, inner: str, count: int) -> None:
+    add_engine(tree, engine_body(hook=marked("godot", "shutdown-hook", inner)))
+    assert any(f"wraps {count} fenced blocks" in e for e in template_errors(tree))
+
+
+def test_heading_inside_marker_pair_fails(tree: Path) -> None:
+    add_engine(tree, engine_body(hook=marked("godot", "shutdown-hook", f"## Shutdown\n\n{HOOK_FENCE}")))
+    assert any("heading" in e for e in template_errors(tree))
+
+
+def test_dockerfile_marker_needs_dockerfile_fence(tree: Path) -> None:
+    add_engine(tree, engine_body(docker=marked("godot", "dockerfile", HOOK_FENCE)))
+    assert any("```dockerfile" in e for e in template_errors(tree))
+
+
+@pytest.mark.parametrize("line", [
+    "<!-- gameye-template: godot -->",
+    "<!--gameye-template: godot/dockerfile-->",
+    "<!-- gameye-template godot/dockerfile -->",
+])
+def test_malformed_marker_fails(tree: Path, line: str) -> None:
+    add_engine(tree, engine_body() + f"\n{line}\n")
+    assert any("malformed" in e for e in template_errors(tree))
+
+
+@pytest.mark.parametrize("pair", ["cryengine/dockerfile", "godot/entrypoint"])
+def test_unknown_engine_or_kind_fails(tree: Path, pair: str) -> None:
+    add_engine(tree, engine_body() + f"\n<!-- gameye-template: {pair} -->\n{DOCKER_FENCE}\n"
+                                     "<!-- /gameye-template -->\n")
+    assert any("unknown" in e and pair in e for e in template_errors(tree))
+
+
+def test_marker_outside_its_engine_skill_fails(tree: Path) -> None:
+    add_engine(tree, engine_body())
+    add_skill_body(tree, "# Sessions\n\n" + marked("unity", "dockerfile", DOCKER_FENCE))
+    assert any("unity/dockerfile" in e and "skills/gameye-unity-server/SKILL.md" in e
+               for e in template_errors(tree))
+
+
+def test_marker_inside_code_fence_is_ignored(tree: Path) -> None:
+    add_engine(tree, engine_body() + "\n```markdown\n<!-- gameye-template: godot/dockerfile -->\n```\n")
+    assert template_errors(tree) == []
+
+
+def test_real_engine_skills_carry_every_template_pair() -> None:
+    errors: list[str] = []
+    found = vs.check_templates(ROOT, errors)
+    assert errors == []
+    assert set(found) == {(e, k) for e in vs.TEMPLATE_ENGINES for k in vs.TEMPLATE_KINDS}

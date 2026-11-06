@@ -2,7 +2,7 @@
 name: gameye-web-server
 description: Build an authoritative Node.js game server for a browser game and host it on Gameye — WebSocket room servers (ws or Colyseus), the tick loop, session-per-match process lifecycle, the TLS/mixed-content reality for browser clients, and the Dockerfile variant for Node servers. Use whenever adding multiplayer to a web game (Phaser, PixiJS, three.js, Kaplay, vanilla canvas — including AI/agent-built games), writing a WebSocket game server, or when the user mentions browser multiplayer, .io-style games, Colyseus, or socket servers.
 metadata:
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 # Web game servers on Gameye
@@ -73,15 +73,7 @@ setInterval(() => wss.clients.forEach((ws) => {
   ws.isAlive = false; ws.ping();
 }), 15000);
 
-async function endMatch() {
-  await reportResults(MATCH_ID, state);   // push to your backend
-  process.exit(0);                        // ends the Gameye session cleanly
-}
-process.on("SIGTERM", async () => {       // stop request / TTL: drain
-  broadcast(wss, { type: "server-closing" });
-  await reportResults(MATCH_ID, state);   // keep this under ~10s; the window
-  process.exit(0);                        // before SIGKILL is up to 50s
-});
+// endMatch() and the SIGTERM drain handler: see Shutdown below.
 
 httpd.listen(PORT, "0.0.0.0", () => console.log(`READY port=${PORT}`));
 ```
@@ -91,6 +83,28 @@ token your matchmaker minted (report joins/leaves to your backend, which relays 
 to Gameye's player endpoints — the server never holds a Gameye API token);
 heartbeat-reap dead sockets so `playerCount` stays honest and empty
 matches actually end; exit 0 on match end and on SIGTERM.
+
+## Shutdown
+
+Add these to `server.js`. Match end and a stop request (or TTL) both report results
+and exit 0:
+
+<!-- gameye-template: web/shutdown-hook -->
+```javascript
+async function endMatch() {
+  await reportResults(MATCH_ID, state);   // push to your backend
+  process.exit(0);                        // ends the Gameye session cleanly
+}
+process.on("SIGTERM", async () => {       // stop request / TTL: drain
+  broadcast(wss, { type: "server-closing" });
+  await reportResults(MATCH_ID, state);   // keep this under ~10s; the window
+  process.exit(0);                        // before SIGKILL is up to 50s
+});
+```
+<!-- /gameye-template -->
+
+The handler only runs if `node` is PID 1; see the entrypoint note under Container
+specifics.
 
 ## TLS and mixed content — decide this early
 
@@ -142,6 +156,7 @@ Build the join flow around option 1 or 2 unless the game will never ship in a br
 
 ## Container specifics
 
+<!-- gameye-template: web/dockerfile -->
 ```dockerfile
 FROM node:22-slim AS deps
 WORKDIR /app
@@ -156,6 +171,7 @@ USER node
 EXPOSE 8080/tcp
 ENTRYPOINT ["node", "server/server.js"]
 ```
+<!-- /gameye-template -->
 
 Run `node` directly — **never `npm start`** as the entrypoint: npm sits between PID 1
 and your process and swallows SIGTERM, so your drain handler simply never runs.

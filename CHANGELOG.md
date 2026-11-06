@@ -13,6 +13,43 @@ release. The versions here tell you what changed and whether your copy is curren
 From 1.6.1, each release is also a git tag (`v1.6.1`) with a GitHub release, so you can
 pin a known version. Earlier versions shipped on `main` without a tag.
 
+## 1.7.0
+
+Pack version 1.7.0. Prepares the skills that `gameye-mcp` 0.5.0 bundles for its
+token-free mode.
+
+### Added
+
+- **Template markers** in `gameye-unreal-server` (1.0.1), `gameye-unity-server`
+  (1.0.1), `gameye-godot-server` (1.1.0) and `gameye-web-server` (1.2.1). Each
+  engine's Dockerfile and shutdown hook is wrapped in
+  `<!-- gameye-template: <engine>/<kind> -->` … `<!-- /gameye-template -->`, so
+  `gameye-mcp` can serve them word for word. The validator checks that every pair is
+  present once, in its engine skill, around exactly one fenced block; CONTRIBUTING.md
+  describes the grammar.
+- **`gameye`** (1.2.0). The routing guide has a third case: `gameye_*` tools present
+  but reporting no token. Prepare offline with the skill, template and Dockerfile-check
+  tools, give the developer the token setup steps (trial.gameye.com, then Admin Panel →
+  Users → API tokens, then the MCP client config and a restart), never fall back to
+  HTTP and never ask for the token in chat. The env table marks `GAMEYE_API_TOKEN`
+  optional from `gameye-mcp` 0.5.0.
+
+### Fixed
+
+- **`gameye-godot-server`** (1.1.0). The SIGTERM advice did not work: in a drain test
+  on Godot 4.7.2 (Linux, headless), Godot as PID 1 ignored SIGTERM until the SIGKILL,
+  and as a child it died at once without running any script, so
+  `NOTIFICATION_WM_CLOSE_REQUEST` never fired. The skill now ships a GDScript shutdown
+  hook (an autoload polling a stop file, one `shutdown()` path with a 10-second cap)
+  and a Dockerfile whose entrypoint is a small `sh` wrapper that turns SIGTERM into that
+  stop file. Rebuild images made from the old Godot Dockerfile.
+
+### Changed
+
+- **`gameye-web-server`** (1.2.1). The `endMatch` and SIGTERM handlers moved out of the
+  authoritative-core `server.js` block into their own block under a new Shutdown
+  heading. The code is unchanged.
+
 ## 1.6.1 - 2026-10-24
 
 Pack version 1.6.1.

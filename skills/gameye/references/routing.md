@@ -8,10 +8,37 @@ is stated once.
 1. **When you, the agent, act on Gameye** (start a test session, read logs, check a
    tag, list sessions for the user): use the `gameye_*` tools from the Gameye MCP
    server (`gameye-mcp`) if they are available in this conversation. If they are
-   not, call the HTTP API directly against the configured host.
+   not, call the HTTP API directly against the configured host. If they are
+   present but report no token, follow "When the tools report no token" below
+   instead; do not switch to HTTP.
 2. **When you write code for the user's backend, allocator, CI job or tooling**:
    that code always calls the HTTP API. MCP tools exist only inside the agent's
    conversation; they are never a runtime dependency of the user's product.
+
+## When the tools report no token
+
+From `gameye-mcp` 0.5.0 the server starts without `GAMEYE_API_TOKEN`. `gameye_context`
+then reports `Token: not configured`, and every account tool refuses without sending
+a request. This is the third case, beside tools present and tools absent:
+
+- **Prepare offline.** Use the token-free tools: `gameye_list_skills` and
+  `gameye_get_skill` to read these skills, `gameye_get_template` for the engine's
+  Dockerfile and shutdown hook, and `gameye_check_dockerfile` to check the user's
+  Dockerfile against the container contract. Get the server build Gameye-ready
+  before an account exists.
+- **Give the developer the setup steps:**
+  1. Sign up at `https://trial.gameye.com`. Self-serve accounts use the sandbox
+     host, which is the server's default.
+  2. In the Admin Panel, open Users → API tokens and create a token with the
+     narrowest scopes the work needs.
+  3. Put the token in the MCP client's configuration for the Gameye server: the
+     plugin's sensitive setting, or `GAMEYE_API_TOKEN` in the server entry's
+     environment, passed from a secret manager or exported variable.
+  4. Restart or reconnect the MCP server. It reads the token only when it starts.
+- **Do not fall back to HTTP.** A missing token is not a missing tool: don't call
+  the API yourself with curl or code, and don't go looking for a token elsewhere.
+- **Never ask for the token in chat.** If the user pastes one anyway, don't use it;
+  tell them to revoke it and create a new one through the configuration above.
 
 ## Before any write, on either path
 

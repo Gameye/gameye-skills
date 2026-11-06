@@ -22,6 +22,8 @@ Checks (each failure is collected; exit code 1 if any):
                (spec/overrides.yaml request-body overrides win), checked one
                level deep (array item types, closed nested objects). A request
                example that can't be parsed fails.
+  templates    each engine skill (gameye-<engine>-server) carries one marker pair
+               per template kind, and nowhere else (see "Template markers" below).
   reference    the generated api-reference.md is current.
   manifests    .claude-plugin/marketplace.json and plugin.json parse; plugin.json
                has no `version` (updates track the commit SHA); the
@@ -57,6 +59,20 @@ Contributing notes
   segment; a plain word there (`DELETE /session/everything`) is reported as an
   ambiguous literal path. Query keys are checked; a trailing `/...` stands
   for "any remaining segments".
+* Template markers: gameye-mcp serves each engine's Dockerfile and shutdown
+  hook verbatim, found by a pair of HTML comments, each alone on its line:
+
+      <!-- gameye-template: <engine>/<kind> -->
+      ```dockerfile
+      ...
+      ```
+      <!-- /gameye-template -->
+
+  engine is one of TEMPLATE_ENGINES, kind one of TEMPLATE_KINDS. Each pair
+  lives in skills/gameye-<engine>-server/SKILL.md, appears exactly once,
+  and wraps exactly one fenced block (```dockerfile for `dockerfile`); prose
+  notes may sit beside the fence, headings and other markers may not. Markers
+  inside a code fence are ignored.
 
 Usage:
   python3 scripts/validate_skills.py [--root DIR] [--base REF]
@@ -139,6 +155,13 @@ DATA_RE = re.compile(
 PLACEHOLDER_RE = re.compile(r"\{[^}]*\}|<[^>]*>|\$\{[^}]*\}|^:[A-Za-z_]\w*$")
 ID_LITERAL_RE = re.compile(r"\d|-|^[0-9a-f]{8,}$", re.IGNORECASE)
 FENCE_RE = re.compile(r"^\s*```")
+
+TEMPLATE_ENGINES = ("unreal", "unity", "godot", "web")
+TEMPLATE_KINDS = ("dockerfile", "shutdown-hook")
+TEMPLATE_OPEN_RE = re.compile(r"^<!-- gameye-template: ([a-z0-9-]+)/([a-z0-9-]+) -->$")
+TEMPLATE_CLOSE = "<!-- /gameye-template -->"
+TEMPLATE_ANY_RE = re.compile(r"^<!--\s*/?\s*gameye-template")
+TEMPLATE_GRAMMAR = "`<!-- gameye-template: <engine>/<kind> -->` ... `<!-- /gameye-template -->`"
 FENCE_LANG_RE = re.compile(r"^\s*```+\s*([A-Za-z0-9_+.-]*)")
 JSON_LANGS = frozenset({"json", "jsonc", "json5"})
 CODE_LANGS = frozenset({"ts", "typescript", "js", "javascript", "jsx", "tsx", "mjs", "cjs"})
@@ -641,6 +664,84 @@ def check_banned(root: Path, errors: list[str]) -> None:
                               f"use one of {', '.join(sorted(ALLOWED_HOSTS))}")
 
 
+def template_skill(engine: str) -> str:
+    return f"skills/gameye-{engine}-server/SKILL.md"
+
+
+def check_templates(root: Path, errors: list[str]) -> dict[tuple[str, str], list[str]]:
+    """Check template marker pairs; return {(engine, kind): [file:line, ...]} of well-formed pairs."""
+    found: dict[tuple[str, str], list[str]] = {}
+    for path in scanned_files(root):
+        rel = path.relative_to(root).as_posix()
+        lines = path.read_text(encoding="utf-8").splitlines()
+        in_fence = False
+        open_pair: tuple[str, str] | None = None
+        open_line = 0
+        for lineno, line in enumerate(lines, 1):
+            if FENCE_RE.match(line):
+                in_fence = not in_fence
+                continue
+            stripped = line.strip()
+            if in_fence or not TEMPLATE_ANY_RE.match(stripped):
+                continue
+            where = f"template: {rel}:{lineno}"
+            if stripped == TEMPLATE_CLOSE:
+                if open_pair is None:
+                    errors.append(f"{where}: closing marker without an opening marker")
+                    continue
+                pair, label = open_pair, "/".join(open_pair)
+                open_pair = None
+                inner = lines[open_line:lineno - 1]
+                fences = [(lang, i) for lang, i, _ in split_blocks(inner) if lang is not None]
+                if len(fences) != 1:
+                    errors.append(f"{where}: `{label}` wraps {len(fences)} fenced blocks; "
+                                  "a marker pair wraps exactly one")
+                    continue
+                if any(l.lstrip().startswith("#") for lang, _, block in split_blocks(inner)
+                       if lang is None for l in block):
+                    errors.append(f"{where}: `{label}` contains a heading; "
+                                  "put the marker pair under the heading")
+                    continue
+                if pair[1] == "dockerfile" and fences[0][0] != "dockerfile":
+                    errors.append(f"{where}: `{label}` must wrap a ```dockerfile fence")
+                    continue
+                found.setdefault(pair, []).append(f"{rel}:{open_line}")
+                continue
+            match = TEMPLATE_OPEN_RE.match(stripped)
+            if not match:
+                errors.append(f"{where}: malformed template marker; use {TEMPLATE_GRAMMAR}")
+                continue
+            engine, kind = match.groups()
+            label = f"{engine}/{kind}"
+            if open_pair is not None:
+                errors.append(f"{where}: `{label}` opens while `{'/'.join(open_pair)}` "
+                              f"(line {open_line}) is still open")
+                continue
+            if engine not in TEMPLATE_ENGINES or kind not in TEMPLATE_KINDS:
+                errors.append(f"{where}: unknown template `{label}`; engines: "
+                              f"{', '.join(TEMPLATE_ENGINES)}; kinds: {', '.join(TEMPLATE_KINDS)}")
+                continue
+            if rel != template_skill(engine):
+                errors.append(f"{where}: `{label}` belongs in {template_skill(engine)}")
+                continue
+            open_pair, open_line = (engine, kind), lineno
+        if open_pair is not None:
+            errors.append(f"template: {rel}:{open_line}: `{'/'.join(open_pair)}` is never closed "
+                          f"with `{TEMPLATE_CLOSE}`")
+    for pair, places in sorted(found.items()):
+        if len(places) > 1:
+            errors.append(f"template: duplicate `{'/'.join(pair)}` at {', '.join(places)}; "
+                          "each pair appears exactly once")
+    for engine in TEMPLATE_ENGINES:
+        if not (root / template_skill(engine)).is_file():
+            continue
+        for kind in TEMPLATE_KINDS:
+            if (engine, kind) not in found:
+                errors.append(f"template: {template_skill(engine)}: missing marker pair "
+                              f"`<!-- gameye-template: {engine}/{kind} -->`")
+    return found
+
+
 def split_blocks(lines: list[str]) -> list[tuple[str, int, list[str]]]:
     """[(lang or None for prose, first line index, lines)]; fence lines exclude the ``` markers."""
     blocks: list[tuple[str | None, int, list[str]]] = []
@@ -1104,6 +1205,7 @@ def validate(root: Path = DEFAULT_ROOT, base: str | None = None,
     names = {d.name for d in dirs}
     check_cross_refs(root, names, errors)
     check_banned(root, errors)
+    check_templates(root, errors)
     check_endpoints_and_bodies(root, Spec(root), errors)
     check_reference(root, errors)
     check_manifests(root, errors)
