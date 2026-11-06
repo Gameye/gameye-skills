@@ -24,8 +24,8 @@
     "gameye_api_token": {
       "type": "string",
       "title": "Gameye API token",
-      "description": "API token from the Gameye Admin Panel (Users > API Tokens) for the environment below. Use the narrowest scopes you need. Stored in secure storage, never in settings.json.",
-      "required": true,
+      "description": "Optional. API token from the Gameye Admin Panel (Users > API Tokens) for the environment below; without one, the Gameye MCP server runs its offline tools (skills, engine templates, Dockerfile check) and account tools return setup steps. Use the narrowest scopes you need. Stored in secure storage, never in settings.json.",
+      "required": false,
       "sensitive": true
     },
     "gameye_env": {
