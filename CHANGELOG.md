@@ -13,15 +13,17 @@ release. The versions here tell you what changed and whether your copy is curren
 From 1.6.1, each release is also a git tag (`v1.6.1`) with a GitHub release, so you can
 pin a known version. Earlier versions shipped on `main` without a tag.
 
-## Unreleased
+## 1.7.1
+
+Pack version 1.7.1. Plugin change only; no skill content changed.
 
 ### Changed
 
 - **Claude Code plugin:** the Gameye API token setting is now optional
   (`required: false`). Without a token, `gameye-mcp` 0.5.0 runs its offline tools
   (bundled skills, engine templates, Dockerfile check) and account tools return setup
-  steps instead of the server refusing to start. Merge only after `gameye-mcp` 0.5.0 is
-  on npm: the plugin runs `npx -y gameye-mcp@0`, and 0.4.0 still exits without a token.
+  steps instead of the server refusing to start. `gameye-mcp` 0.5.0
+  is on npm, and the plugin's `npx -y gameye-mcp@0` picks it up.
 
 ## 1.7.0
 
