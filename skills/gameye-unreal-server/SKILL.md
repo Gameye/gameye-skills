@@ -2,7 +2,7 @@
 name: gameye-unreal-server
 description: Produce an Unreal Engine dedicated server build that runs on Gameye — the Server build target, Linux cross-compilation, packaging, runtime flags, and the Dockerfile variant for Unreal server builds. Use whenever building or debugging an Unreal dedicated server, adding a Server target to a UE project, packaging a Linux server build, or when the user mentions Unreal server hosting, UE dedicated servers, or running Unreal on Gameye.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Unreal dedicated servers on Gameye
@@ -88,10 +88,12 @@ organization) carries only short-lived per-match values.
 SIGTERM triggers Unreal's engine-exit path. Hook cleanup once and reuse it for the
 natural match end:
 
+<!-- gameye-template: unreal/shutdown-hook -->
 ```cpp
 FCoreDelegates::OnEnginePreExit.AddStatic(&ReportResultsAndFlush);
 // on match end: ReportResultsAndFlush(); FPlatformMisc::RequestExit(false);
 ```
+<!-- /gameye-template -->
 
 Get the essentials out within about 10 seconds of SIGTERM; the window before the
 container is killed is up to 50 seconds, but don't spend it. Write replays/stats you
@@ -102,6 +104,7 @@ ends; don't seamless-travel back to a lobby on a hosted session.
 
 ## Container specifics
 
+<!-- gameye-template: unreal/dockerfile -->
 ```dockerfile
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
@@ -115,6 +118,7 @@ EXPOSE 7777/udp
 ENTRYPOINT ["/server/MyGameServer.sh", "-port=7777", "-log", "-stdout", \
             "-FullStdOutLogOutput", "-unattended"]
 ```
+<!-- /gameye-template -->
 
 `MyGameServer.sh` execs the real binary, so PID 1 signal delivery works. Build with
 `--platform=linux/amd64`. UE servers are hungrier than most — measure a full match

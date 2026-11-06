@@ -68,6 +68,21 @@ When you change the body of any `SKILL.md`, the same pull request must:
 
 Changing only the pack version line does not count as a change to the `gameye` skill. The validator enforces all three in CI.
 
+## Template markers
+
+`gameye-mcp` serves each engine's Dockerfile and shutdown hook word for word, found by a pair of HTML comments in the engine skill (`skills/gameye-<engine>-server/SKILL.md`):
+
+````markdown
+<!-- gameye-template: godot/dockerfile -->
+```dockerfile
+FROM debian:bookworm-slim
+...
+```
+<!-- /gameye-template -->
+````
+
+The engine is `unreal`, `unity`, `godot` or `web`; the kind is `dockerfile` or `shutdown-hook`. Each marker sits alone on its line, and each pair appears exactly once, in its own engine skill, wrapping exactly one fenced block (a `dockerfile` fence for the `dockerfile` kind). A short prose note may sit beside the fence inside the pair; a heading may not. When you edit a template, keep its markers in place. The validator enforces all of this.
+
 ## Refreshing the spec snapshots
 
 `spec/client.yaml` comes from the public sandbox endpoint:

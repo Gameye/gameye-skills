@@ -2,7 +2,7 @@
 name: gameye-unity-server
 description: Produce a Unity dedicated server build that runs on Gameye — the Dedicated Server build target, netcode choices (Netcode for GameObjects, FishNet, Mirror, Photon Fusion), runtime configuration, shutdown, and the Dockerfile variant for Unity server builds. Use whenever building or debugging a Unity multiplayer server, adding dedicated server support to a Unity project, or when the user mentions Unity headless builds, Unity server hosting, Unity Matchmaker, or running Unity on Gameye.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Unity dedicated servers on Gameye
@@ -91,10 +91,12 @@ token lives on that server side, never in the client or game server
 On SIGTERM the Unity player initiates an orderly quit. Put flush logic in one place
 and wire it to both paths — signal-initiated quit and natural match end:
 
+<!-- gameye-template: unity/shutdown-hook -->
 ```csharp
 Application.quitting += ReportResultsAndFlush;
 // on match end: ReportResultsAndFlush(); Application.Quit(0);
 ```
+<!-- /gameye-template -->
 
 Keep `ReportResultsAndFlush` fast: the essentials should be out within about 10
 seconds of SIGTERM, well inside the up-to-50-second window before the container is
@@ -109,6 +111,7 @@ The Linux Dedicated Server build output is a binary plus a `_Data` folder (and f
 IL2CPP, `UnityPlayer.so` and friends). On top of the standard pattern in
 `gameye-containerize`:
 
+<!-- gameye-template: unity/dockerfile -->
 ```dockerfile
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
@@ -122,6 +125,7 @@ USER game
 EXPOSE 7777/udp
 ENTRYPOINT ["/server/MyGameServer", "-batchmode", "-nographics", "-logFile", "-"]
 ```
+<!-- /gameye-template -->
 
 - **`-logFile -`** routes the Unity player log to stdout — without it your logs go to
   a file inside the container and the Gameye logs endpoint shows nothing.

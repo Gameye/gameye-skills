@@ -2,12 +2,12 @@
 name: gameye
 description: Ship and host a multiplayer game on Gameye, the managed dedicated game server platform (Docker image in, ip:port out). Use this skill whenever the user mentions Gameye, wants to host or deploy a multiplayer game server, asks how players will connect to matches, wants dedicated servers for a Unity/Unreal/Godot/web game, or has built a game and asks how to run its multiplayer backend — even if they never say the word "hosting". It orients on the platform, picks the right API host for the customer's tier, explains when to use the Gameye MCP tools versus HTTP, and routes to the specialized gameye-* skills for server design, engine builds, containerization, the sessions API, matchmaking, testing, and launch.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Gameye
 
-Pack version: 1.6.1
+Pack version: 1.7.0
 
 Gameye is managed dedicated game server hosting. The whole platform reduces to one
 interaction: you push a Docker image of your game server to your registry, and your
@@ -137,14 +137,16 @@ shell history.
 
 | Variable | Meaning |
 |---|---|
-| `GAMEYE_API_TOKEN` | Required. The API token the server uses. |
+| `GAMEYE_API_TOKEN` | The API token the server uses. Optional from `gameye-mcp` 0.5.0; without it the server runs offline tools only. Earlier versions require it. |
 | `GAMEYE_ENV` | `sandbox` (default) or `production`. Fixed for the life of the server. |
 | `GAMEYE_API_URL` | Optional https override of the host, for testing. |
 
 Whether you use the MCP tools or HTTP follows one rule, stated in
 [references/routing.md](references/routing.md): when you act on Gameye yourself, use
-`gameye_*` tools if present, otherwise HTTP against the configured host; code you
-write for the user's backend always uses HTTP. Read it before your first API action.
+`gameye_*` tools if present, otherwise HTTP against the configured host; if the
+tools report no token, prepare offline and give the user the token setup steps
+instead of using HTTP. Code you write for the user's backend always uses HTTP. Read
+it before your first API action.
 
 ## Keeping these skills current
 
